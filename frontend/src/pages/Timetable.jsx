@@ -46,7 +46,7 @@ export default function Timetable() {
     setSaving(true);
     setError("");
     try {
-      await api.post("/timetable", { ...form, class_id: form.class_id || classId });
+      await api.post("/timetable", { ...form, class_id: form.class_id || classId, teacher_id: form.teacher_id || null });
       setModalOpen(false);
       setForm(emptyForm);
       loadSlots();
