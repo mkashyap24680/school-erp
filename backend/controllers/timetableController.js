@@ -52,8 +52,10 @@ exports.getMyTimetable = async (req, res) => {
 // POST /api/timetable (admin, management)
 exports.createSlot = async (req, res) => {
   try {
-    const slot = await TimetableSlot.create(req.body);
-    await logAction(req, { action: "create", entity: "TimetableSlot", entityId: slot.id, details: req.body });
+    const payload = { ...req.body };
+    if (payload.teacher_id === "") payload.teacher_id = null;
+    const slot = await TimetableSlot.create(payload);
+    await logAction(req, { action: "create", entity: "TimetableSlot", entityId: slot.id, details: payload });
     res.status(201).json(slot);
   } catch (err) {
     res.status(500).json({ message: "Failed to create timetable slot.", error: err.message });
