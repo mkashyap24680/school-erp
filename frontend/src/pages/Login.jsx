@@ -60,6 +60,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex page-bg">
+      {/* Left Banner Section */}
       <div className="hidden lg:flex w-1/2 bg-navy-900 text-white flex-col justify-between p-12 relative overflow-hidden">
         <div className="absolute -right-24 -bottom-24 w-96 h-96 bg-brand-500/20 rounded-full" />
         <div className="absolute right-10 top-10 w-40 h-40 bg-brand-500/10 rounded-full" />
@@ -80,13 +81,15 @@ export default function Login() {
           <p className="mt-4 text-white/70 max-w-md">
             {profile?.tagline || "Manage your school & college management from anywhere in the world."}
           </p>
-          <div className="relative z-10 flex gap-8 text-sm text-white/60">
-          <div><div className="font-bold text-white text-lg">1,250+</div>Students</div>
-          <div><div className="font-bold text-white text-lg">85+</div>Teachers</div>
-          <div><div className="font-bold text-white text-lg">95%</div>Attendance</div>
+          <div className="relative z-10 flex gap-8 text-sm text-white/60 mt-6">
+            <div><div className="font-bold text-white text-lg">1,250+</div>Students</div>
+            <div><div className="font-bold text-white text-lg">85+</div>Teachers</div>
+            <div><div className="font-bold text-white text-lg">95%</div>Attendance</div>
+          </div>
         </div>
-        </div>
-        
+      </div>
+
+      {/* Right Login Form Section */}
       <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md">
           <div className="flex items-center gap-2 mb-8 lg:hidden">
@@ -102,17 +105,18 @@ export default function Login() {
                 <GraduationCap size={24} />
               </div>
               <h2 className="text-2xl font-bold text-navy-900">Welcome back</h2>
-                  <p className="text-navy-900/50 text-sm mt-1 mb-6">
-                    Login to your Admin, Management, Teacher or Student account.
-                  </p>
-                  
-                  {idleLogout && (
-                    <div className="mb-4 text-sm bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-3 py-2 flex items-center gap-2">
-                      <Info size={16} /> You were logged out due to inactivity. Please sign in again.
-                    </div>
-                  )}
+              <p className="text-navy-900/50 text-sm mt-1 mb-6">
+                Login to your Admin, Management, Teacher or Student account.
+              </p>
 
-                  {error && <div className="mb-4 text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
+              {idleLogout && (
+                <div className="mb-4 text-sm bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-3 py-2 flex items-center gap-2">
+                  <Info size={16} /> You were logged out due to inactivity. Please sign in again.
+                </div>
+              )}
+
+              {error && <div className="mb-4 text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
+
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="form-label">Email address</label>
