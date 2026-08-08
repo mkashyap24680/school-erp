@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { Wallet } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import Modal from "../components/Modal";
-import { ReceiptButton, ConsolidatedReceiptButton } from "../components/ReceiptButton";
+import DataTable from "../components/DataTable";
+import ReceiptButton from "../components/ReceiptButton";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
@@ -25,17 +26,12 @@ export default function Fees() {
 function StudentFees() {
   const { user } = useAuth();
   const [fees, setFees] = useState([]);
-  const [studentProfile, setStudentProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [payModal, setPayModal] = useState(null); // fee being paid
   const [paying, setPaying] = useState(false);
   const [payStep, setPayStep] = useState("confirm"); // confirm | success
 
-  const load = () => {
-    api.get("/fees/me")
-      .then((res) => { setFees(res.data.fees); setStudentProfile(res.data.student); })
-      .finally(() => setLoading(false));
-  };
+  const load = () => { api.get("/fees/me").then((res) => setFees(res.data)).finally(() => setLoading(false)); };
   useEffect(load, []);
 
   const totalDue = fees.reduce((sum, f) => sum + Number(f.amount) - Number(f.paid_amount), 0);
@@ -64,11 +60,10 @@ function StudentFees() {
         <div className="w-14 h-14 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
           <Wallet size={26} />
         </div>
-        <div className="flex-1">
+        <div>
           <div className="text-2xl font-bold text-navy-900">₹{totalDue.toLocaleString()}</div>
           <div className="text-sm text-navy-900/50">Total outstanding balance</div>
         </div>
-        <ConsolidatedReceiptButton fees={fees} student={studentProfile} studentName={user?.name} label="Download Full Receipt" />
       </div>
 
       <div className="card p-4 sm:p-5 overflow-x-auto">
@@ -93,7 +88,7 @@ function StudentFees() {
                       <button onClick={() => startPayment(f)} className="btn-primary text-xs">Pay Now</button>
                     )}
                     {Number(f.paid_amount) > 0 && (
-                      <ReceiptButton fee={f} student={studentProfile} studentName={user?.name || "Student"} />
+                      <ReceiptButton fee={f} studentName={user?.name || "Student"} />
                     )}
                   </div>
                 </td>
@@ -131,76 +126,7 @@ function StudentFees() {
   );
 }
 
-// One editable cell for a single fee category within a student's row.
-// Typing an amount + paid value and blurring the field saves it directly —
-// no separate "edit" modal. Clearing the amount removes the fee record for
-// that category (or zeroes it out if the user isn't allowed to delete).
-function FeeCell({ studentId, category, records, canDelete, onSaved }) {
-  const total = records.reduce((s, r) => s + Number(r.amount), 0);
-  const paidTotal = records.reduce((s, r) => s + Number(r.paid_amount), 0);
-  const [amount, setAmount] = useState(total ? String(total) : "");
-  const [paid, setPaid] = useState(paidTotal ? String(paidTotal) : "");
-  const [saving, setSaving] = useState(false);
-
-  const initialAmount = total ? String(total) : "";
-  const initialPaid = paidTotal ? String(paidTotal) : "";
-
-  const save = async () => {
-    if (amount === initialAmount && paid === initialPaid) return; // nothing changed
-    setSaving(true);
-    try {
-      const amt = amount === "" ? 0 : Number(amount);
-      const paidAmt = paid === "" ? 0 : Number(paid);
-
-      if (amt <= 0) {
-        // Cell cleared out — remove the record(s) for this category if allowed.
-        if (records.length > 0 && canDelete) {
-          await Promise.all(records.map((r) => api.delete(`/fees/${r.id}`)));
-        } else if (records.length > 0) {
-          await api.put(`/fees/${records[0].id}`, { amount: 0, paid_amount: 0 });
-        }
-      } else {
-        const [target, ...extras] = records;
-        if (canDelete && extras.length) {
-          await Promise.all(extras.map((r) => api.delete(`/fees/${r.id}`)));
-        }
-        const payload = { category, title: CATEGORY_LABEL[category], amount: amt, paid_amount: paidAmt };
-        if (target) {
-          await api.put(`/fees/${target.id}`, payload);
-        } else {
-          await api.post("/fees", { ...payload, student_id: studentId });
-        }
-      }
-      onSaved();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const due = (Number(amount) || 0) - (Number(paid) || 0);
-
-  return (
-    <div className="flex flex-col gap-1 min-w-[110px]">
-      <input
-        type="number" min="0" placeholder="Amount" value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-        disabled={saving}
-        className="form-input !py-1 !px-2 text-xs"
-      />
-      <input
-        type="number" min="0" placeholder="Paid" value={paid}
-        onChange={(e) => setPaid(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
-        disabled={saving}
-        className="form-input !py-1 !px-2 text-xs"
-      />
-      {amount !== "" && <span className="text-[10px] text-navy-900/40">Due ₹{due.toLocaleString()}</span>}
-    </div>
-  );
-}
+const emptyForm = { student_id: "", category: "tuition", title: "", amount: "", paid_amount: 0, due_date: "" };
 
 function StaffFees() {
   const { user } = useAuth();
@@ -209,7 +135,11 @@ function StaffFees() {
   const [fees, setFees] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const load = () => {
     setLoading(true);
@@ -220,94 +150,141 @@ function StaffFees() {
 
   useEffect(load, []);
 
-  // One row per student, one column per fee category. Every cell aggregates
-  // whatever fee record(s) already exist for that student + category so old
-  // duplicate rows (e.g. two "Tuition" entries) collapse into a single
-  // editable cell the moment they're saved again.
-  const pivotRows = useMemo(() => {
-    return students
-      .map((s) => {
-        const studentFees = fees.filter((f) => f.student_id === s.id);
-        const cells = {};
-        let totalAmount = 0;
-        let totalPaid = 0;
-        for (const c of CATEGORIES) {
-          const records = studentFees.filter((f) => f.category === c.value);
-          cells[c.value] = records;
-          totalAmount += records.reduce((sum, r) => sum + Number(r.amount), 0);
-          totalPaid += records.reduce((sum, r) => sum + Number(r.paid_amount), 0);
-        }
-        return { student: s, cells, allFees: studentFees, totalAmount, totalPaid, totalDue: totalAmount - totalPaid };
-      })
-      .filter((row) => {
-        if (!search.trim()) return true;
-        const q = search.toLowerCase();
-        return (
-          row.student.name?.toLowerCase().includes(q) ||
-          row.student.roll_no?.toLowerCase().includes(q) ||
-          (row.student.SchoolClass && `${row.student.SchoolClass.name} ${row.student.SchoolClass.section}`.toLowerCase().includes(q))
-        );
-      });
-  }, [students, fees, search]);
+  const openCreate = () => { setEditingId(null); setForm(emptyForm); setError(""); setModalOpen(true); };
+  const openEdit = (f) => {
+    setEditingId(f.id);
+    setForm({
+      student_id: f.student_id, category: f.category || "tuition", title: f.title, amount: f.amount,
+      paid_amount: f.paid_amount, due_date: f.due_date || "",
+    });
+    setError("");
+    setModalOpen(true);
+  };
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  // When category changes and the title is still empty/default, auto-fill a
+  // sensible title so the admin doesn't have to type it every time.
+  const handleCategoryChange = (e) => {
+    const category = e.target.value;
+    const wasAutoTitle = !form.title || CATEGORIES.some((c) => c.label === form.title);
+    setForm({
+      ...form,
+      category,
+      title: wasAutoTitle ? CATEGORY_LABEL[category] : form.title,
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      if (editingId) {
+        await api.put(`/fees/${editingId}`, form);
+      } else {
+        await api.post("/fees", form);
+      }
+      setModalOpen(false);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save fee record.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this fee record?")) return;
+    await api.delete(`/fees/${id}`);
+    load();
+  };
+
+  const columns = [
+    { key: "student", label: "Student", exportValue: (f) => f.Student?.name || "—", render: (f) => <span className="font-medium">{f.Student?.name || "—"}</span> },
+    { key: "title", label: "Title" },
+    { key: "category", label: "Category", exportValue: (f) => CATEGORY_LABEL[f.category] || "Tuition Fee", render: (f) => <span className="badge badge-gray">{CATEGORY_LABEL[f.category] || "Tuition Fee"}</span> },
+    { key: "amount", label: "Amount", exportValue: (f) => Number(f.amount), render: (f) => `₹${Number(f.amount).toLocaleString()}`, sortValue: (f) => Number(f.amount) },
+    { key: "paid_amount", label: "Paid", exportValue: (f) => Number(f.paid_amount), render: (f) => `₹${Number(f.paid_amount).toLocaleString()}`, sortValue: (f) => Number(f.paid_amount) },
+    { key: "due_date", label: "Due Date" },
+    { key: "status", label: "Status", render: (f) => <StatusBadge status={f.status} /> },
+  ];
 
   return (
     <DashboardLayout title="Fee Management">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-navy-900/50 text-sm">Fill each student's fee amount &amp; paid amount directly, per fee type.</p>
-        <input
-          placeholder="Search students..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="form-input max-w-xs"
-        />
+        <p className="text-navy-900/50 text-sm">Track fee collection, dues &amp; payments.</p>
+        <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Add Fee Record</button>
       </div>
 
-      <div className="card p-4 sm:p-5 overflow-x-auto">
+      <div className="card p-4 sm:p-5">
         {loading ? (
           <div className="text-center py-8 text-navy-900/40 text-sm">Loading...</div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Class</th>
-                {CATEGORIES.map((c) => <th key={c.value}>{c.label}</th>)}
-                <th>Total Due</th>
-                <th>Receipt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pivotRows.length === 0 && (
-                <tr><td colSpan={CATEGORIES.length + 4} className="text-center py-8 text-navy-900/40">No students found.</td></tr>
-              )}
-              {pivotRows.map((row) => (
-                <tr key={row.student.id}>
-                  <td className="font-medium align-top pt-3">{row.student.name}</td>
-                  <td className="align-top pt-3">
-                    {row.student.SchoolClass ? `${row.student.SchoolClass.name} - ${row.student.SchoolClass.section}` : "—"}
-                  </td>
-                  {CATEGORIES.map((c) => (
-                    <td key={c.value} className="align-top">
-                      <FeeCell
-                        key={`${c.value}-${row.cells[c.value].map((r) => r.id).join(",")}`}
-                        studentId={row.student.id}
-                        category={c.value}
-                        records={row.cells[c.value]}
-                        canDelete={canDelete}
-                        onSaved={load}
-                      />
-                    </td>
-                  ))}
-                  <td className="align-top pt-3 font-semibold">₹{row.totalDue.toLocaleString()}</td>
-                  <td className="align-top pt-3">
-                    <ConsolidatedReceiptButton fees={row.allFees} student={row.student} studentName={row.student.name} label="" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            columns={columns}
+            rows={fees}
+            searchPlaceholder="Search fee records..."
+            exportFileName="fees"
+            actionsColumn={(f) => (
+              <div className="flex gap-1">
+                {Number(f.paid_amount) > 0 && (
+                  <ReceiptButton fee={f} studentName={f.Student?.name || "Student"} />
+                )}
+                <button onClick={() => openEdit(f)} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
+                  <Pencil size={15} />
+                </button>
+                {canDelete && (
+                  <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            )}
+          />
         )}
       </div>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? "Edit Fee Record" : "Add Fee Record"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
+          <div>
+            <label className="form-label">Student</label>
+            <select name="student_id" required value={form.student_id} onChange={handleChange} className="form-input">
+              <option value="">Select student</option>
+              {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Fee category</label>
+            <select name="category" value={form.category} onChange={handleCategoryChange} className="form-input">
+              {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Fee title</label>
+            <input name="title" required placeholder="e.g. Term 1 Fee" value={form.title} onChange={handleChange} className="form-input" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Amount (₹)</label>
+              <input type="number" name="amount" required min="0" value={form.amount} onChange={handleChange} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Paid amount (₹)</label>
+              <input type="number" name="paid_amount" min="0" value={form.paid_amount} onChange={handleChange} className="form-input" />
+            </div>
+          </div>
+          <div>
+            <label className="form-label">Due date</label>
+            <input type="date" name="due_date" value={form.due_date} onChange={handleChange} className="form-input" />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setModalOpen(false)} className="btn-outline">Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary">{saving ? "Saving..." : "Save"}</button>
+          </div>
+        </form>
+      </Modal>
     </DashboardLayout>
   );
 }
