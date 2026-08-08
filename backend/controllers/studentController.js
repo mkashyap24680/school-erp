@@ -5,7 +5,14 @@ const { logAction } = require("../utils/audit");
 exports.getAllStudents = async (req, res) => {
   try {
     const students = await Student.findAll({
-      include: [{ model: SchoolClass, attributes: ["id", "name", "section"] }],
+      include: [{ model: SchoolClass, attributes: [
+  "id",
+  "course_name",
+  "course_code",
+  "department_name",
+  "department_code",
+  "section",
+] }],
       order: [["name", "ASC"]],
     });
     res.json(students);
@@ -18,7 +25,14 @@ exports.getAllStudents = async (req, res) => {
 exports.getStudentById = async (req, res) => {
   try {
     const student = await Student.findByPk(req.params.id, {
-      include: [{ model: SchoolClass, attributes: ["id", "name", "section"] }],
+      include: [{ model: SchoolClass, attributes: [
+  "id",
+  "course_name",
+  "course_code",
+  "department_name",
+  "department_code",
+  "section",
+] }],
     });
     if (!student) return res.status(404).json({ message: "Student not found." });
     res.json(student);
@@ -32,7 +46,14 @@ exports.getMyStudentProfile = async (req, res) => {
   try {
     const student = await Student.findOne({
       where: { user_id: req.user.id },
-      include: [{ model: SchoolClass, attributes: ["id", "name", "section"] }],
+      include: [{ model: SchoolClass, attributes: [
+  "id",
+  "course_name",
+  "course_code",
+  "department_name",
+  "department_code",
+  "section",
+] }],
     });
     if (!student) return res.status(404).json({ message: "Student profile not found." });
     res.json(student);
