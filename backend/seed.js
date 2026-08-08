@@ -26,7 +26,13 @@ async function seed() {
     // Optional: create one demo class so the dashboard isn't empty
     const existingClass = await SchoolClass.findOne();
     if (!existingClass) {
-      await SchoolClass.create({ name: "10th", section: "A" });
+      await SchoolClass.create({
+  course_name: "B.Tech",
+  course_code: "BT",
+  department_name: "Computer Science & Engineering",
+  department_code: "CSE",
+  section: "A",
+});
       console.log("✔ Demo class '10th A' created.");
     }
 
