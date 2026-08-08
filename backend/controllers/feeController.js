@@ -1,4 +1,4 @@
-const { Fee, Student, SchoolClass } = require("../models");
+const { Fee, Student } = require("../models");
 const { logAction } = require("../utils/audit");
 const { notifyUser } = require("../utils/notify");
 
@@ -8,20 +8,11 @@ function computeStatus(amount, paidAmount) {
   return "partial";
 }
 
-// Student attributes + nested class needed for printable receipts
-// (class/section, roll no, admission no) — reused by getAllFees & getMyFees
-// so every fee record carries full student context, not just name.
-const studentInclude = {
-  model: Student,
-  attributes: ["id", "name", "roll_no", "admission_no"],
-  include: [{ model: SchoolClass, attributes: ["id", "name", "section"] }],
-};
-
 // GET /api/fees
 exports.getAllFees = async (req, res) => {
   try {
     const fees = await Fee.findAll({
-      include: [studentInclude],
+      include: [{ model: Student, attributes: ["id", "name", "roll_no"] }],
       order: [["due_date", "ASC"]],
     });
     res.json(fees);
@@ -33,19 +24,14 @@ exports.getAllFees = async (req, res) => {
 // GET /api/fees/me (student's own fee records)
 exports.getMyFees = async (req, res) => {
   try {
-    const student = await Student.findOne({
-      where: { user_id: req.user.id },
-      include: [{ model: SchoolClass, attributes: ["id", "name", "section"] }],
-    });
+    const student = await Student.findOne({ where: { user_id: req.user.id } });
     if (!student) return res.status(404).json({ message: "Student profile not found." });
 
     const fees = await Fee.findAll({
       where: { student_id: student.id },
       order: [["due_date", "ASC"]],
     });
-    // Attach the student's own profile (name, roll/admission no, class) to the
-    // response so the frontend can print a full receipt without a second call.
-    res.json({ student, fees });
+    res.json(fees);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch fees.", error: err.message });
   }
