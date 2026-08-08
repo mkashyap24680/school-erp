@@ -92,9 +92,38 @@ export default function Students() {
     { key: "admission_no", label: "Admission No" },
     {
       key: "class", label: "Class",
-      exportValue: (s) => (s.SchoolClass ? `${s.SchoolClass.name} ${s.SchoolClass.section}` : "—"),
-      render: (s) => (s.SchoolClass ? `${s.SchoolClass.name} ${s.SchoolClass.section}` : "—"),
-      sortValue: (s) => (s.SchoolClass ? s.SchoolClass.name : ""),
+      exportValue: (s) => {
+  if (!s.SchoolClass) return "—";
+
+  const c = s.SchoolClass;
+
+  return [
+    c.course_name,
+    c.department_name,
+    c.section ? `Section ${c.section}` : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+},
+
+render: (s) => {
+  if (!s.SchoolClass) return "—";
+
+  const c = s.SchoolClass;
+
+  return [
+    c.course_name,
+    c.department_name,
+    c.section ? `Section ${c.section}` : null,
+  ]
+    .filter(Boolean)
+    .join(" — ");
+},
+
+sortValue: (s) =>
+  s.SchoolClass
+    ? `${s.SchoolClass.course_name} ${s.SchoolClass.department_name}`
+    : "",
     },
     { key: "parent_phone", label: "Parent Contact" },
   ];
@@ -171,7 +200,10 @@ export default function Students() {
               <select name="class_id" value={form.class_id} onChange={handleChange} className="form-input">
                 <option value="">Unassigned</option>
                 {classes.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name} {c.section}</option>
+                  <option key={c.id} value={c.id}>
+                      {c.course_name} — {c.department_name}
+                      {c.section ? ` — Section ${c.section}` : ""}
+                    </option>
                 ))}
               </select>
             </div>
