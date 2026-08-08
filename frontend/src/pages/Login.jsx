@@ -103,12 +103,17 @@ export default function Login() {
                 <GraduationCap size={24} />
               </div>
               <h2 className="text-2xl font-bold text-navy-900">Welcome back</h2>
-              <p className="text-navy-900/50 text-sm mt-1 mb-6">
-                Login to your Admin, Management, Teacher or Student account.
-              </p>
+                  <p className="text-navy-900/50 text-sm mt-1 mb-6">
+                    Login to your Admin, Management, Teacher or Student account.
+                  </p>
+                  
+                  {idleLogout && (
+                    <div className="mb-4 text-sm bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-3 py-2 flex items-center gap-2">
+                      <Info size={16} /> You were logged out due to inactivity. Please sign in again.
+                    </div>
+                  )}
 
-              {error && <div className="mb-4 text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
-
+                  {error && <div className="mb-4 text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="form-label">Email address</label>
