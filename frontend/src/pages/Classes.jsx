@@ -171,22 +171,80 @@ export default function Classes() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
           <div>
-            <label className="form-label">Class name (e.g. 10th)</label>
-            <input name="name" required value={form.name} onChange={handleChange} className="form-input" />
-          </div>
-          <div>
-            <label className="form-label">Section (e.g. A)</label>
-            <input name="section" required value={form.section} onChange={handleChange} className="form-input" />
-          </div>
-          <div>
-            <label className="form-label">Class teacher</label>
-            <select name="teacher_id" value={form.teacher_id} onChange={handleChange} className="form-input">
-              <option value="">Not assigned</option>
-              {teachers.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
+  <label className="form-label">Course name</label>
+  <input
+    name="course_name"
+    required
+    placeholder="e.g. B.Tech"
+    value={form.course_name}
+    onChange={handleChange}
+    className="form-input"
+  />
+</div>
+
+<div>
+  <label className="form-label">Course code</label>
+  <input
+    name="course_code"
+    placeholder="e.g. BT"
+    value={form.course_code}
+    onChange={handleChange}
+    className="form-input"
+  />
+</div>
+
+<div>
+  <label className="form-label">Department name</label>
+  <input
+    name="department_name"
+    required
+    placeholder="e.g. Computer Science & Engineering"
+    value={form.department_name}
+    onChange={handleChange}
+    className="form-input"
+  />
+</div>
+
+<div>
+  <label className="form-label">Department code</label>
+  <input
+    name="department_code"
+    placeholder="e.g. CSE"
+    value={form.department_code}
+    onChange={handleChange}
+    className="form-input"
+  />
+</div>
+
+<div>
+  <label className="form-label">
+    Section <span className="font-normal opacity-50">(Optional)</span>
+  </label>
+  <input
+    name="section"
+    placeholder="e.g. A"
+    value={form.section}
+    onChange={handleChange}
+    className="form-input"
+  />
+</div>
+
+<div>
+  <label className="form-label">Class teacher</label>
+  <select
+    name="teacher_id"
+    value={form.teacher_id}
+    onChange={handleChange}
+    className="form-input"
+  >
+    <option value="">Not assigned</option>
+    {teachers.map((t) => (
+      <option key={t.id} value={t.id}>
+        {t.name}
+      </option>
+    ))}
+  </select>
+</div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setModalOpen(false)} className="btn-outline">Cancel</button>
             <button type="submit" disabled={saving} className="btn-primary">{saving ? "Saving..." : "Save Class"}</button>
