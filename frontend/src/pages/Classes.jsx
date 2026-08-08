@@ -5,7 +5,14 @@ import Modal from "../components/Modal";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
-const emptyForm = { name: "", section: "", teacher_id: "" };
+const emptyForm = {
+  course_name: "",
+  course_code: "",
+  department_name: "",
+  department_code: "",
+  section: "",
+  teacher_id: "",
+};
 
 export default function Classes() {
   const { user } = useAuth();
@@ -41,34 +48,56 @@ export default function Classes() {
   };
 
   const openEdit = (c) => {
-    setEditingId(c.id);
-    setForm({ name: c.name || "", section: c.section || "", teacher_id: c.teacher_id || "" });
-    setError("");
-    setModalOpen(true);
-  };
+  setEditingId(c.id);
+
+  setForm({
+    course_name: c.course_name || "",
+    course_code: c.course_code || "",
+    department_name: c.department_name || "",
+    department_code: c.department_code || "",
+    section: c.section || "",
+    teacher_id: c.teacher_id || "",
+  });
+
+  setError("");
+  setModalOpen(true);
+};
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    try {
-      const payload = { ...form, teacher_id: form.teacher_id || null };
-      if (editingId) {
-        await api.put(`/classes/${editingId}`, payload);
-      } else {
-        await api.post("/classes", payload);
-      }
-      setModalOpen(false);
-      load();
-    } catch (err) {
-      setError(err.response?.data?.message || "Failed to save class.");
-    } finally {
-      setSaving(false);
-    }
-  };
+  e.preventDefault();
 
+  setSaving(true);
+  setError("");
+
+  try {
+    const payload = {
+      course_name: form.course_name,
+      course_code: form.course_code || null,
+      department_name: form.department_name,
+      department_code: form.department_code || null,
+      section: form.section || null,
+      teacher_id: form.teacher_id || null,
+    };
+
+    if (editingId) {
+      await api.put(`/classes/${editingId}`, payload);
+    } else {
+      await api.post("/classes", payload);
+    }
+
+    setModalOpen(false);
+    load();
+  } catch (err) {
+    setError(
+      err.response?.data?.message ||
+        "Failed to save class."
+    );
+  } finally {
+    setSaving(false);
+  }
+};
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this class? This cannot be undone.")) return;
     await api.delete(`/classes/${id}`);
@@ -96,10 +125,24 @@ export default function Classes() {
             <div key={c.id} className="card p-5">
               <div className="flex items-start justify-between">
                 <div>
-                  <h3 className="font-bold text-navy-900 text-lg">{c.name} - {c.section}</h3>
-                  <p className="text-sm text-navy-900/50 mt-1">
-                    Class teacher: {c.classTeacher?.name || "Not assigned"}
-                  </p>
+                  <h3 className="font-bold text-navy-900 text-lg">
+                        {c.course_name}
+                      </h3>
+                      
+                      <p className="text-sm text-navy-900/60 mt-1">
+                        {c.course_code || "Course"}
+                      </p>
+                      
+                      <p className="text-sm text-navy-900/70 mt-3">
+                        {c.department_name}
+                        {c.department_code && ` (${c.department_code})`}
+                      </p>
+                      
+                      {c.section && (
+                        <p className="text-sm text-navy-900/50 mt-1">
+                          Section: {c.section}
+                        </p>
+                      )}
                 </div>
                 {(canEdit || canDelete) && (
                   <div className="flex gap-1">
