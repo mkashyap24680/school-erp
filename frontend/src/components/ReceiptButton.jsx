@@ -1,176 +1,295 @@
-import { useState } from "react";
-import jsPDF from "jspdf";
-import { Receipt, FileStack } from "lucide-react";
-import { useSchoolProfile } from "../context/SchoolProfileContext";
+import { useEffect, useState } from "react";
+import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
+import DashboardLayout from "../components/DashboardLayout";
+import Modal from "../components/Modal";
+import DataTable from "../components/DataTable";
+import ReceiptButton from "../components/ReceiptButton";
+import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 
-// Builds a student "meta" object (class/section, roll no, admission no) from
-// either a Fee row's nested `Student` (admin table) or a raw Student profile
-// (student's own /fees/me response). Keeps the two callers in sync.
-function extractStudentMeta(student) {
-  if (!student) return {};
-  const cls = student.SchoolClass;
-  return {
-    name: student.name,
-    rollNo: student.roll_no,
-    admissionNo: student.admission_no,
-    className: cls ? `${cls.name}${cls.section ? " - " + cls.section : ""}` : "",
-  };
+const CATEGORIES = [
+  { value: "tuition", label: "Tuition Fee" },
+  { value: "transport", label: "Transport Fee" },
+  { value: "hostel", label: "Hostel Fee" },
+  { value: "library", label: "Library Fee" },
+  { value: "exam", label: "Exam Fee" },
+  { value: "other", label: "Other" },
+];
+const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
+
+export default function Fees() {
+  const { user } = useAuth();
+  if (user?.role === "student") return <StudentFees />;
+  return <StaffFees />;
 }
 
-// Shared PDF layout. `items` is always an array of one or more fee records so
-// the same function renders a single-item receipt or a full, itemized
-// receipt covering every fee record for a student (S.No / Particulars /
-// Amount), matching a standard institute fee receipt.
-function buildReceiptDoc({ items, meta, schoolName }) {
-  const doc = new jsPDF({ format: "a5" });
-  const pageWidth = 148;
-  const centerX = pageWidth / 2;
+function StudentFees() {
+  const { user } = useAuth();
+  const [fees, setFees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [payModal, setPayModal] = useState(null); // fee being paid
+  const [paying, setPaying] = useState(false);
+  const [payStep, setPayStep] = useState("confirm"); // confirm | success
 
-  doc.setFontSize(15);
-  doc.text(schoolName, centerX, 16, { align: "center" });
-  doc.setFontSize(10);
-  doc.text(items.length > 1 ? "CONSOLIDATED FEE RECEIPT" : "FEE PAYMENT RECEIPT", centerX, 23, { align: "center" });
-  doc.setLineWidth(0.5);
-  doc.line(12, 27, 136, 27);
+  const load = () => { api.get("/fees/me").then((res) => setFees(res.data)).finally(() => setLoading(false)); };
+  useEffect(load, []);
 
-  const latestPaymentDate = items
-    .map((f) => f.payment_date)
-    .filter(Boolean)
-    .sort()
-    .pop();
-  const receiptNo = `RCPT-${items.map((f) => f.id).join("-")}-${new Date(latestPaymentDate || Date.now()).getFullYear()}`;
+  const totalDue = fees.reduce((sum, f) => sum + Number(f.amount) - Number(f.paid_amount), 0);
 
-  doc.setFontSize(9);
-  doc.text(`Receipt No: ${receiptNo}`, 12, 35);
-  doc.text(`Date: ${latestPaymentDate || new Date().toISOString().slice(0, 10)}`, 100, 35);
+  const startPayment = (fee) => { setPayModal(fee); setPayStep("confirm"); };
 
-  doc.text(`Student Name: ${meta.name || "-"}`, 12, 42);
-  doc.text(`Class: ${meta.className || "-"}`, 100, 42);
-  doc.text(`Roll No: ${meta.rollNo || "-"}`, 12, 48);
-  doc.text(`Admission No: ${meta.admissionNo || "-"}`, 100, 48);
-
-  doc.setLineWidth(0.2);
-  doc.line(12, 53, 136, 53);
-
-  // Itemized table header
-  let y = 60;
-  doc.setFont(undefined, "bold");
-  doc.text("S.No", 14, y);
-  doc.text("Particulars", 30, y);
-  doc.text("Paid Amount", 124, y, { align: "right" });
-  doc.setFont(undefined, "normal");
-  y += 3;
-  doc.line(12, y, 136, y);
-  y += 6;
-
-  let totalPaid = 0;
-  let totalDue = 0;
-  items.forEach((f, idx) => {
-    const paid = Number(f.paid_amount) || 0;
-    const balance = Number(f.amount) - paid;
-    totalPaid += paid;
-    totalDue += balance;
-    doc.text(String(idx + 1), 14, y);
-    doc.text(f.title, 30, y);
-    doc.text(`Rs.${paid.toLocaleString()}`, 124, y, { align: "right" });
-    y += 7;
-  });
-
-  y += 1;
-  doc.line(12, y, 136, y);
-  y += 7;
-
-  doc.setFont(undefined, "bold");
-  doc.text("Total Paid", 30, y);
-  doc.text(`Rs.${totalPaid.toLocaleString()}`, 124, y, { align: "right" });
-  doc.setFont(undefined, "normal");
-  y += 7;
-
-  if (totalDue > 0) {
-    doc.text("Balance Due", 30, y);
-    doc.text(`Rs.${totalDue.toLocaleString()}`, 124, y, { align: "right" });
-    y += 7;
-  }
-
-  doc.setFontSize(8);
-  doc.text(
-    "This is a computer-generated receipt and does not require a signature.",
-    centerX,
-    y + 10,
-    { align: "center" }
-  );
-
-  return { doc, receiptNo };
-}
-
-/**
- * Downloads a receipt for a single fee record. Kept for the per-row action
- * button so a staff member can still print one payment on its own.
- */
-export function ReceiptButton({ fee, student, studentName }) {
-  const { profile } = useSchoolProfile();
-  const [loading, setLoading] = useState(false);
-
-  const handleGenerate = () => {
-    setLoading(true);
+  const handlePay = async () => {
+    setPaying(true);
     try {
-      const meta = { ...extractStudentMeta(student), name: student?.name || studentName };
-      const { doc } = buildReceiptDoc({
-        items: [fee],
-        meta,
-        schoolName: profile?.school_name || "Your School Name",
-      });
-      doc.save(`Receipt_${(meta.name || "Student").replace(/\s+/g, "_")}_${fee.title.replace(/\s+/g, "_")}.pdf`);
+      const orderRes = await api.post("/payments/order", { fee_id: payModal.id });
+      // In production this is where Razorpay/Stripe's checkout widget would
+      // open using orderRes.data.orderId. Here we simulate an instant success.
+      await api.post("/payments/confirm", { paymentId: orderRes.data.paymentId });
+      setPayStep("success");
+      load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Payment failed.");
     } finally {
-      setLoading(false);
+      setPaying(false);
     }
   };
 
   return (
-    <button onClick={handleGenerate} disabled={loading} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60" title="Download Receipt">
-      <Receipt size={15} />
-    </button>
+    <DashboardLayout title="My Fees">
+      <div className="card p-5 mb-6 flex items-center gap-4">
+        <div className="w-14 h-14 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+          <Wallet size={26} />
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-navy-900">₹{totalDue.toLocaleString()}</div>
+          <div className="text-sm text-navy-900/50">Total outstanding balance</div>
+        </div>
+      </div>
+
+      <div className="card p-4 sm:p-5 overflow-x-auto">
+        <table className="data-table">
+          <thead><tr><th>Title</th><th>Category</th><th>Amount</th><th>Paid</th><th>Due Date</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            {loading && <tr><td colSpan={7} className="text-center py-8 text-navy-900/40">Loading...</td></tr>}
+            {!loading && fees.length === 0 && (
+              <tr><td colSpan={7} className="text-center py-8 text-navy-900/40">No fee records yet.</td></tr>
+            )}
+            {fees.map((f) => (
+              <tr key={f.id}>
+                <td className="font-medium">{f.title}</td>
+                <td><span className="badge badge-gray">{CATEGORY_LABEL[f.category] || "Tuition Fee"}</span></td>
+                <td>₹{Number(f.amount).toLocaleString()}</td>
+                <td>₹{Number(f.paid_amount).toLocaleString()}</td>
+                <td>{f.due_date || "—"}</td>
+                <td><StatusBadge status={f.status} /></td>
+                <td>
+                  <div className="flex items-center gap-2">
+                    {f.status !== "paid" && (
+                      <button onClick={() => startPayment(f)} className="btn-primary text-xs">Pay Now</button>
+                    )}
+                    {Number(f.paid_amount) > 0 && (
+                      <ReceiptButton fee={f} studentName={user?.name || "Student"} />
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal open={!!payModal} onClose={() => setPayModal(null)} title="Pay Fee">
+        {payModal && payStep === "confirm" && (
+          <div className="text-center py-2">
+            <p className="text-sm text-navy-900/60 mb-1">{payModal.title}</p>
+            <div className="text-3xl font-extrabold text-navy-900 mb-4">
+              ₹{(Number(payModal.amount) - Number(payModal.paid_amount)).toLocaleString()}
+            </div>
+            <p className="text-xs text-navy-900/40 mb-6">
+              Demo checkout — no real card details needed. In production this would open your school's
+              configured payment gateway (Razorpay/Stripe).
+            </p>
+            <button onClick={handlePay} disabled={paying} className="btn-primary w-full justify-center py-2.5">
+              {paying ? "Processing..." : "Pay Now"}
+            </button>
+          </div>
+        )}
+        {payStep === "success" && (
+          <div className="text-center py-6">
+            <div className="text-3xl mb-2">✅</div>
+            <p className="font-semibold text-navy-900">Payment successful!</p>
+            <button onClick={() => setPayModal(null)} className="btn-outline mt-4">Close</button>
+          </div>
+        )}
+      </Modal>
+    </DashboardLayout>
   );
 }
 
-/**
- * Downloads ONE consolidated receipt covering every fee record passed in
- * (e.g. all of a student's records: Tuition, Transport, Exam Fee...), each
- * shown as its own line item — instead of a separate PDF per row.
- */
-export function ConsolidatedReceiptButton({ fees, student, studentName, label = "Full Receipt" }) {
-  const { profile } = useSchoolProfile();
-  const [loading, setLoading] = useState(false);
+const emptyForm = { student_id: "", category: "tuition", title: "", amount: "", paid_amount: 0, due_date: "" };
 
-  const payableFees = fees.filter((f) => Number(f.paid_amount) > 0);
+function StaffFees() {
+  const { user } = useAuth();
+  const canDelete = user?.role === "admin";
 
-  const handleGenerate = () => {
+  const [fees, setFees] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = () => {
     setLoading(true);
+    Promise.all([api.get("/fees"), api.get("/students")])
+      .then(([fRes, sRes]) => { setFees(fRes.data); setStudents(sRes.data); })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  const openCreate = () => { setEditingId(null); setForm(emptyForm); setError(""); setModalOpen(true); };
+  const openEdit = (f) => {
+    setEditingId(f.id);
+    setForm({
+      student_id: f.student_id, category: f.category || "tuition", title: f.title, amount: f.amount,
+      paid_amount: f.paid_amount, due_date: f.due_date || "",
+    });
+    setError("");
+    setModalOpen(true);
+  };
+
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  // When category changes and the title is still empty/default, auto-fill a
+  // sensible title so the admin doesn't have to type it every time.
+  const handleCategoryChange = (e) => {
+    const category = e.target.value;
+    const wasAutoTitle = !form.title || CATEGORIES.some((c) => c.label === form.title);
+    setForm({
+      ...form,
+      category,
+      title: wasAutoTitle ? CATEGORY_LABEL[category] : form.title,
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
     try {
-      const meta = { ...extractStudentMeta(student), name: student?.name || studentName };
-      const { doc } = buildReceiptDoc({
-        items: payableFees,
-        meta,
-        schoolName: profile?.school_name || "Your School Name",
-      });
-      doc.save(`Receipt_${(meta.name || "Student").replace(/\s+/g, "_")}_Consolidated.pdf`);
+      if (editingId) {
+        await api.put(`/fees/${editingId}`, form);
+      } else {
+        await api.post("/fees", form);
+      }
+      setModalOpen(false);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to save fee record.");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (payableFees.length === 0) return null;
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this fee record?")) return;
+    await api.delete(`/fees/${id}`);
+    load();
+  };
+
+  const columns = [
+    { key: "student", label: "Student", exportValue: (f) => f.Student?.name || "—", render: (f) => <span className="font-medium">{f.Student?.name || "—"}</span> },
+    { key: "title", label: "Title" },
+    { key: "category", label: "Category", exportValue: (f) => CATEGORY_LABEL[f.category] || "Tuition Fee", render: (f) => <span className="badge badge-gray">{CATEGORY_LABEL[f.category] || "Tuition Fee"}</span> },
+    { key: "amount", label: "Amount", exportValue: (f) => Number(f.amount), render: (f) => `₹${Number(f.amount).toLocaleString()}`, sortValue: (f) => Number(f.amount) },
+    { key: "paid_amount", label: "Paid", exportValue: (f) => Number(f.paid_amount), render: (f) => `₹${Number(f.paid_amount).toLocaleString()}`, sortValue: (f) => Number(f.paid_amount) },
+    { key: "due_date", label: "Due Date" },
+    { key: "status", label: "Status", render: (f) => <StatusBadge status={f.status} /> },
+  ];
 
   return (
-    <button
-      onClick={handleGenerate}
-      disabled={loading}
-      className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60 inline-flex items-center gap-1 text-xs font-medium"
-      title="Download one receipt covering all fee records for this student"
-    >
-      <FileStack size={15} /> {label}
-    </button>
+    <DashboardLayout title="Fee Management">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-navy-900/50 text-sm">Track fee collection, dues &amp; payments.</p>
+        <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Add Fee Record</button>
+      </div>
+
+      <div className="card p-4 sm:p-5">
+        {loading ? (
+          <div className="text-center py-8 text-navy-900/40 text-sm">Loading...</div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={fees}
+            searchPlaceholder="Search fee records..."
+            exportFileName="fees"
+            actionsColumn={(f) => (
+              <div className="flex gap-1">
+                {Number(f.paid_amount) > 0 && (
+                  <ReceiptButton fee={f} studentName={f.Student?.name || "Student"} />
+                )}
+                <button onClick={() => openEdit(f)} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
+                  <Pencil size={15} />
+                </button>
+                {canDelete && (
+                  <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+            )}
+          />
+        )}
+      </div>
+
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? "Edit Fee Record" : "Add Fee Record"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
+          <div>
+            <label className="form-label">Student</label>
+            <select name="student_id" required value={form.student_id} onChange={handleChange} className="form-input">
+              <option value="">Select student</option>
+              {students.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Fee category</label>
+            <select name="category" value={form.category} onChange={handleCategoryChange} className="form-input">
+              {CATEGORIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Fee title</label>
+            <input name="title" required placeholder="e.g. Term 1 Fee" value={form.title} onChange={handleChange} className="form-input" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Amount (₹)</label>
+              <input type="number" name="amount" required min="0" value={form.amount} onChange={handleChange} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Paid amount (₹)</label>
+              <input type="number" name="paid_amount" min="0" value={form.paid_amount} onChange={handleChange} className="form-input" />
+            </div>
+          </div>
+          <div>
+            <label className="form-label">Due date</label>
+            <input type="date" name="due_date" value={form.due_date} onChange={handleChange} className="form-input" />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setModalOpen(false)} className="btn-outline">Cancel</button>
+            <button type="submit" disabled={saving} className="btn-primary">{saving ? "Saving..." : "Save"}</button>
+          </div>
+        </form>
+      </Modal>
+    </DashboardLayout>
   );
 }
 
-export default ReceiptButton;
+function StatusBadge({ status }) {
+  const cls = status === "paid" ? "badge-green" : status === "partial" ? "badge-orange" : "badge-red";
+  return <span className={`badge ${cls} capitalize`}>{status}</span>;
+}
