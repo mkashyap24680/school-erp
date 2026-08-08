@@ -80,6 +80,11 @@ export default function Login() {
           <p className="mt-4 text-white/70 max-w-md">
             {profile?.tagline || "Manage your school & college management from anywhere in the world."}
           </p>
+          <div className="relative z-10 flex gap-8 text-sm text-white/60">
+          <div><div className="font-bold text-white text-lg">1,250+</div>Students</div>
+          <div><div className="font-bold text-white text-lg">85+</div>Teachers</div>
+          <div><div className="font-bold text-white text-lg">95%</div>Attendance</div>
+        </div>
         </div>
         
       <div className="flex-1 flex items-center justify-center p-6 sm:p-10">
