@@ -5,22 +5,43 @@ exports.getAllClasses = async (req, res) => {
   try {
     const classes = await SchoolClass.findAll({
       include: [
-        { model: Teacher, as: "classTeacher", attributes: ["id", "name"] },
-        { model: Student, attributes: ["id"] },
+        {
+          model: Teacher,
+          as: "classTeacher",
+          attributes: ["id", "name"],
+        },
+        {
+          model: Student,
+          attributes: ["id"],
+        },
       ],
-      order: [["name", "ASC"], ["section", "ASC"]],
+      order: [
+        ["course_name", "ASC"],
+        ["department_name", "ASC"],
+        ["section", "ASC"],
+      ],
     });
 
-    const withCounts = classes.map((c) => {
+    const result = classes.map((c) => {
       const json = c.toJSON();
-      json.studentCount = json.Students ? json.Students.length : 0;
+
+      json.studentCount = json.Students
+        ? json.Students.length
+        : 0;
+
       delete json.Students;
+
       return json;
     });
 
-    res.json(withCounts);
+    res.json(result);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch classes.", error: err.message });
+    console.error("getAllClasses:", err);
+
+    res.status(500).json({
+      message: "Failed to fetch classes.",
+      error: err.message,
+    });
   }
 };
 
@@ -29,24 +50,74 @@ exports.getClassById = async (req, res) => {
   try {
     const schoolClass = await SchoolClass.findByPk(req.params.id, {
       include: [
-        { model: Teacher, as: "classTeacher", attributes: ["id", "name"] },
-        { model: Student, attributes: ["id", "name", "roll_no"] },
+        {
+          model: Teacher,
+          as: "classTeacher",
+          attributes: ["id", "name"],
+        },
+        {
+          model: Student,
+          attributes: ["id", "name", "roll_no"],
+        },
       ],
     });
-    if (!schoolClass) return res.status(404).json({ message: "Class not found." });
+
+    if (!schoolClass) {
+      return res.status(404).json({
+        message: "Class not found.",
+      });
+    }
+
     res.json(schoolClass);
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch class.", error: err.message });
+    res.status(500).json({
+      message: "Failed to fetch class.",
+      error: err.message,
+    });
   }
 };
 
-// POST /api/classes  (admin, management)
+// POST /api/classes
 exports.createClass = async (req, res) => {
   try {
-    const schoolClass = await SchoolClass.create(req.body);
+    const {
+      course_name,
+      course_code,
+      department_name,
+      department_code,
+      section,
+      teacher_id,
+    } = req.body;
+
+    if (!course_name?.trim()) {
+      return res.status(400).json({
+        message: "Course name is required.",
+      });
+    }
+
+    if (!department_name?.trim()) {
+      return res.status(400).json({
+        message: "Department name is required.",
+      });
+    }
+
+    const schoolClass = await SchoolClass.create({
+      course_name: course_name.trim(),
+      course_code: course_code?.trim() || null,
+      department_name: department_name.trim(),
+      department_code: department_code?.trim() || null,
+      section: section?.trim() || null,
+      teacher_id: teacher_id || null,
+    });
+
     res.status(201).json(schoolClass);
   } catch (err) {
-    res.status(500).json({ message: "Failed to create class.", error: err.message });
+    console.error("createClass:", err);
+
+    res.status(500).json({
+      message: "Failed to create class.",
+      error: err.message,
+    });
   }
 };
 
@@ -54,22 +125,76 @@ exports.createClass = async (req, res) => {
 exports.updateClass = async (req, res) => {
   try {
     const schoolClass = await SchoolClass.findByPk(req.params.id);
-    if (!schoolClass) return res.status(404).json({ message: "Class not found." });
-    await schoolClass.update(req.body);
+
+    if (!schoolClass) {
+      return res.status(404).json({
+        message: "Class not found.",
+      });
+    }
+
+    const {
+      course_name,
+      course_code,
+      department_name,
+      department_code,
+      section,
+      teacher_id,
+    } = req.body;
+
+    if (!course_name?.trim()) {
+      return res.status(400).json({
+        message: "Course name is required.",
+      });
+    }
+
+    if (!department_name?.trim()) {
+      return res.status(400).json({
+        message: "Department name is required.",
+      });
+    }
+
+    await schoolClass.update({
+      course_name: course_name.trim(),
+      course_code: course_code?.trim() || null,
+      department_name: department_name.trim(),
+      department_code: department_code?.trim() || null,
+      section: section?.trim() || null,
+      teacher_id: teacher_id || null,
+    });
+
     res.json(schoolClass);
   } catch (err) {
-    res.status(500).json({ message: "Failed to update class.", error: err.message });
+    console.error("updateClass:", err);
+
+    res.status(500).json({
+      message: "Failed to update class.",
+      error: err.message,
+    });
   }
 };
 
-// DELETE /api/classes/:id (admin only)
+// DELETE /api/classes/:id
 exports.deleteClass = async (req, res) => {
   try {
     const schoolClass = await SchoolClass.findByPk(req.params.id);
-    if (!schoolClass) return res.status(404).json({ message: "Class not found." });
+
+    if (!schoolClass) {
+      return res.status(404).json({
+        message: "Class not found.",
+      });
+    }
+
     await schoolClass.destroy();
-    res.json({ message: "Class deleted." });
+
+    res.json({
+      message: "Class deleted.",
+    });
   } catch (err) {
-    res.status(500).json({ message: "Failed to delete class.", error: err.message });
+    console.error("deleteClass:", err);
+
+    res.status(500).json({
+      message: "Failed to delete class.",
+      error: err.message,
+    });
   }
 };
