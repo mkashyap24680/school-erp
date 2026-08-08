@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
+import { Plus, Pencil, Trash2, Wallet, Eye } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import Modal from "../components/Modal";
 import DataTable from "../components/DataTable";
@@ -156,7 +156,12 @@ function StaffFees() {
 
   useEffect(load, []);
 
-  const openCreate = () => { setEditingId(null); setForm(emptyForm); setError(""); setModalOpen(true); };
+  const openCreate = (presetStudentId) => {
+    setEditingId(null);
+    setForm(presetStudentId ? { ...emptyForm, student_id: presetStudentId } : emptyForm);
+    setError("");
+    setModalOpen(true);
+  };
   const openEdit = (f) => {
     setEditingId(f.id);
     setForm({
@@ -206,57 +211,51 @@ function StaffFees() {
     load();
   };
 
-  // Group every fee record by student so we can offer one consolidated
-  // receipt per student instead of forcing a separate download per row.
-  const feesByStudent = useMemo(() => {
+  // One row per student: every fee record for that student is rolled up
+  // into a single total/paid/due instead of showing a separate row each.
+  const studentRows = useMemo(() => {
     const map = new Map();
     for (const f of fees) {
       const sid = f.student_id;
-      if (!map.has(sid)) map.set(sid, { student: f.Student, items: [] });
-      map.get(sid).items.push(f);
+      if (!map.has(sid)) {
+        map.set(sid, { studentId: sid, student: f.Student, items: [], totalAmount: 0, totalPaid: 0 });
+      }
+      const group = map.get(sid);
+      group.items.push(f);
+      group.totalAmount += Number(f.amount);
+      group.totalPaid += Number(f.paid_amount);
     }
-    return [...map.values()].filter((g) => g.items.some((f) => Number(f.paid_amount) > 0));
+    return [...map.values()].map((g) => {
+      const totalDue = g.totalAmount - g.totalPaid;
+      const status = g.totalPaid <= 0 ? "unpaid" : totalDue <= 0 ? "paid" : "partial";
+      return { ...g, totalDue, status };
+    });
   }, [fees]);
 
+  const [manageStudentId, setManageStudentId] = useState(null);
+  const manageGroup = studentRows.find((g) => g.studentId === manageStudentId) || null;
+
   const columns = [
-    { key: "student", label: "Student", exportValue: (f) => f.Student?.name || "—", render: (f) => <span className="font-medium">{f.Student?.name || "—"}</span> },
+    { key: "student", label: "Student", exportValue: (g) => g.student?.name || "—", render: (g) => <span className="font-medium">{g.student?.name || "—"}</span> },
     {
       key: "class",
       label: "Class",
-      exportValue: (f) => (f.Student?.SchoolClass ? `${f.Student.SchoolClass.name} - ${f.Student.SchoolClass.section}` : "—"),
-      render: (f) => (f.Student?.SchoolClass ? `${f.Student.SchoolClass.name} - ${f.Student.SchoolClass.section}` : "—"),
+      exportValue: (g) => (g.student?.SchoolClass ? `${g.student.SchoolClass.name} - ${g.student.SchoolClass.section}` : "—"),
+      render: (g) => (g.student?.SchoolClass ? `${g.student.SchoolClass.name} - ${g.student.SchoolClass.section}` : "—"),
     },
-    { key: "title", label: "Title" },
-    { key: "category", label: "Category", exportValue: (f) => CATEGORY_LABEL[f.category] || "Tuition Fee", render: (f) => <span className="badge badge-gray">{CATEGORY_LABEL[f.category] || "Tuition Fee"}</span> },
-    { key: "amount", label: "Amount", exportValue: (f) => Number(f.amount), render: (f) => `₹${Number(f.amount).toLocaleString()}`, sortValue: (f) => Number(f.amount) },
-    { key: "paid_amount", label: "Paid", exportValue: (f) => Number(f.paid_amount), render: (f) => `₹${Number(f.paid_amount).toLocaleString()}`, sortValue: (f) => Number(f.paid_amount) },
-    { key: "due_date", label: "Due Date" },
-    { key: "status", label: "Status", render: (f) => <StatusBadge status={f.status} /> },
+    { key: "records", label: "Records", exportValue: (g) => g.items.length, render: (g) => g.items.length },
+    { key: "totalAmount", label: "Total Amount", exportValue: (g) => g.totalAmount, render: (g) => `₹${g.totalAmount.toLocaleString()}`, sortValue: (g) => g.totalAmount },
+    { key: "totalPaid", label: "Paid", exportValue: (g) => g.totalPaid, render: (g) => `₹${g.totalPaid.toLocaleString()}`, sortValue: (g) => g.totalPaid },
+    { key: "totalDue", label: "Due", exportValue: (g) => g.totalDue, render: (g) => `₹${g.totalDue.toLocaleString()}`, sortValue: (g) => g.totalDue },
+    { key: "status", label: "Status", render: (g) => <StatusBadge status={g.status} /> },
   ];
 
   return (
     <DashboardLayout title="Fee Management">
       <div className="flex items-center justify-between mb-4">
         <p className="text-navy-900/50 text-sm">Track fee collection, dues &amp; payments.</p>
-        <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Add Fee Record</button>
+        <button onClick={() => openCreate()} className="btn-primary"><Plus size={16} /> Add Fee Record</button>
       </div>
-
-      {!loading && feesByStudent.length > 0 && (
-        <div className="card p-4 sm:p-5 mb-4">
-          <p className="text-sm font-semibold text-navy-900 mb-3">
-            Consolidated receipts — one PDF per student covering all their fee records
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {feesByStudent.map(({ student, items }) => (
-              <div key={student?.id ?? Math.random()} className="flex items-center gap-2 border border-[#e5e8ee] rounded-lg px-3 py-1.5">
-                <span className="text-sm font-medium text-navy-900">{student?.name || "—"}</span>
-                <span className="text-xs text-navy-900/40">({items.length} records)</span>
-                <ConsolidatedReceiptButton fees={items} student={student} studentName={student?.name} />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="card p-4 sm:p-5">
         {loading ? (
@@ -264,27 +263,71 @@ function StaffFees() {
         ) : (
           <DataTable
             columns={columns}
-            rows={fees}
-            searchPlaceholder="Search fee records..."
+            rows={studentRows}
+            searchPlaceholder="Search students..."
             exportFileName="fees"
-            actionsColumn={(f) => (
+            actionsColumn={(g) => (
               <div className="flex gap-1">
-                {Number(f.paid_amount) > 0 && (
-                  <ReceiptButton fee={f} student={f.Student} studentName={f.Student?.name || "Student"} />
-                )}
-                <button onClick={() => openEdit(f)} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
-                  <Pencil size={15} />
+                <ConsolidatedReceiptButton fees={g.items} student={g.student} studentName={g.student?.name} label="" />
+                <button onClick={() => setManageStudentId(g.studentId)} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60" title="View / manage fee records">
+                  <Eye size={15} />
                 </button>
-                {canDelete && (
-                  <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
-                    <Trash2 size={15} />
-                  </button>
-                )}
               </div>
             )}
           />
         )}
       </div>
+
+      {/* Per-student breakdown: every individual fee record, with edit/delete,
+          reachable from the row's "eye" action instead of cluttering the main table. */}
+      <Modal open={!!manageGroup} onClose={() => setManageStudentId(null)} title={manageGroup ? `Fee records — ${manageGroup.student?.name || ""}` : ""}>
+        {manageGroup && (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between text-sm bg-[#f8f9fb] rounded-lg px-3 py-2">
+              <span>Total: <strong>₹{manageGroup.totalAmount.toLocaleString()}</strong></span>
+              <span>Paid: <strong>₹{manageGroup.totalPaid.toLocaleString()}</strong></span>
+              <span>Due: <strong>₹{manageGroup.totalDue.toLocaleString()}</strong></span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="data-table">
+                <thead><tr><th>Title</th><th>Category</th><th>Amount</th><th>Paid</th><th>Due Date</th><th>Status</th><th></th></tr></thead>
+                <tbody>
+                  {manageGroup.items.map((f) => (
+                    <tr key={f.id}>
+                      <td className="font-medium">{f.title}</td>
+                      <td><span className="badge badge-gray">{CATEGORY_LABEL[f.category] || "Tuition Fee"}</span></td>
+                      <td>₹{Number(f.amount).toLocaleString()}</td>
+                      <td>₹{Number(f.paid_amount).toLocaleString()}</td>
+                      <td>{f.due_date || "—"}</td>
+                      <td><StatusBadge status={f.status} /></td>
+                      <td>
+                        <div className="flex gap-1 justify-end">
+                          <button onClick={() => { setManageStudentId(null); openEdit(f); }} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
+                            <Pencil size={15} />
+                          </button>
+                          {canDelete && (
+                            <button onClick={() => handleDelete(f.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex justify-end pt-1">
+              <button
+                onClick={() => { setManageStudentId(null); openCreate(manageGroup.studentId); }}
+                className="btn-outline text-sm"
+              >
+                <Plus size={14} /> Add another fee for this student
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? "Edit Fee Record" : "Add Fee Record"}>
         <form onSubmit={handleSubmit} className="space-y-4">
