@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Wallet } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import Modal from "../components/Modal";
 import DataTable from "../components/DataTable";
-import ReceiptButton from "../components/ReceiptButton";
+import { ReceiptButton, ConsolidatedReceiptButton } from "../components/ReceiptButton";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
@@ -26,12 +26,17 @@ export default function Fees() {
 function StudentFees() {
   const { user } = useAuth();
   const [fees, setFees] = useState([]);
+  const [studentProfile, setStudentProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [payModal, setPayModal] = useState(null); // fee being paid
   const [paying, setPaying] = useState(false);
   const [payStep, setPayStep] = useState("confirm"); // confirm | success
 
-  const load = () => { api.get("/fees/me").then((res) => setFees(res.data)).finally(() => setLoading(false)); };
+  const load = () => {
+    api.get("/fees/me")
+      .then((res) => { setFees(res.data.fees); setStudentProfile(res.data.student); })
+      .finally(() => setLoading(false));
+  };
   useEffect(load, []);
 
   const totalDue = fees.reduce((sum, f) => sum + Number(f.amount) - Number(f.paid_amount), 0);
@@ -60,10 +65,11 @@ function StudentFees() {
         <div className="w-14 h-14 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
           <Wallet size={26} />
         </div>
-        <div>
+        <div className="flex-1">
           <div className="text-2xl font-bold text-navy-900">₹{totalDue.toLocaleString()}</div>
           <div className="text-sm text-navy-900/50">Total outstanding balance</div>
         </div>
+        <ConsolidatedReceiptButton fees={fees} student={studentProfile} studentName={user?.name} label="Download Full Receipt" />
       </div>
 
       <div className="card p-4 sm:p-5 overflow-x-auto">
@@ -88,7 +94,7 @@ function StudentFees() {
                       <button onClick={() => startPayment(f)} className="btn-primary text-xs">Pay Now</button>
                     )}
                     {Number(f.paid_amount) > 0 && (
-                      <ReceiptButton fee={f} studentName={user?.name || "Student"} />
+                      <ReceiptButton fee={f} student={studentProfile} studentName={user?.name || "Student"} />
                     )}
                   </div>
                 </td>
@@ -200,8 +206,26 @@ function StaffFees() {
     load();
   };
 
+  // Group every fee record by student so we can offer one consolidated
+  // receipt per student instead of forcing a separate download per row.
+  const feesByStudent = useMemo(() => {
+    const map = new Map();
+    for (const f of fees) {
+      const sid = f.student_id;
+      if (!map.has(sid)) map.set(sid, { student: f.Student, items: [] });
+      map.get(sid).items.push(f);
+    }
+    return [...map.values()].filter((g) => g.items.some((f) => Number(f.paid_amount) > 0));
+  }, [fees]);
+
   const columns = [
     { key: "student", label: "Student", exportValue: (f) => f.Student?.name || "—", render: (f) => <span className="font-medium">{f.Student?.name || "—"}</span> },
+    {
+      key: "class",
+      label: "Class",
+      exportValue: (f) => (f.Student?.SchoolClass ? `${f.Student.SchoolClass.name} - ${f.Student.SchoolClass.section}` : "—"),
+      render: (f) => (f.Student?.SchoolClass ? `${f.Student.SchoolClass.name} - ${f.Student.SchoolClass.section}` : "—"),
+    },
     { key: "title", label: "Title" },
     { key: "category", label: "Category", exportValue: (f) => CATEGORY_LABEL[f.category] || "Tuition Fee", render: (f) => <span className="badge badge-gray">{CATEGORY_LABEL[f.category] || "Tuition Fee"}</span> },
     { key: "amount", label: "Amount", exportValue: (f) => Number(f.amount), render: (f) => `₹${Number(f.amount).toLocaleString()}`, sortValue: (f) => Number(f.amount) },
@@ -217,6 +241,23 @@ function StaffFees() {
         <button onClick={openCreate} className="btn-primary"><Plus size={16} /> Add Fee Record</button>
       </div>
 
+      {!loading && feesByStudent.length > 0 && (
+        <div className="card p-4 sm:p-5 mb-4">
+          <p className="text-sm font-semibold text-navy-900 mb-3">
+            Consolidated receipts — one PDF per student covering all their fee records
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {feesByStudent.map(({ student, items }) => (
+              <div key={student?.id ?? Math.random()} className="flex items-center gap-2 border border-[#e5e8ee] rounded-lg px-3 py-1.5">
+                <span className="text-sm font-medium text-navy-900">{student?.name || "—"}</span>
+                <span className="text-xs text-navy-900/40">({items.length} records)</span>
+                <ConsolidatedReceiptButton fees={items} student={student} studentName={student?.name} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="card p-4 sm:p-5">
         {loading ? (
           <div className="text-center py-8 text-navy-900/40 text-sm">Loading...</div>
@@ -229,7 +270,7 @@ function StaffFees() {
             actionsColumn={(f) => (
               <div className="flex gap-1">
                 {Number(f.paid_amount) > 0 && (
-                  <ReceiptButton fee={f} studentName={f.Student?.name || "Student"} />
+                  <ReceiptButton fee={f} student={f.Student} studentName={f.Student?.name || "Student"} />
                 )}
                 <button onClick={() => openEdit(f)} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
                   <Pencil size={15} />
