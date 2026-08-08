@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { GraduationCap, Mail, Lock, Loader2, ShieldCheck } from "lucide-react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { GraduationCap, Mail, Lock, Loader2, ShieldCheck, Info } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSchoolProfile } from "../context/SchoolProfileContext";
 import api from "../api/axios";
@@ -9,6 +9,8 @@ export default function Login() {
   const { login } = useAuth();
   const { profile } = useSchoolProfile();
   const navigate = useNavigate();
+  const location = useLocation();
+  const idleLogout = location.state?.reason === "idle";
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
