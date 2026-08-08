@@ -15,6 +15,11 @@ const Fee = sequelize.define("Fee", {
     type: DataTypes.STRING, // e.g. "Term 1 Fee", "Transport Fee"
     allowNull: false,
   },
+  category: {
+    type: DataTypes.ENUM("Tuition", "Transport", "Hostel", "Library", "Exam", "Other"),
+    defaultValue: "Tuition",
+    allowNull: false,
+  },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
