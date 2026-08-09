@@ -164,11 +164,6 @@ export default function Classes() {
               </p>
 
               <div className="flex flex-wrap gap-1.5 mt-2.5">
-                {c.section && (
-                  <span className="badge badge-gray text-[10px]">
-                    Sec {c.section}
-                  </span>
-                )}
                 {c.year && (
                   <span className="badge badge-gray text-[10px]">
                     {c.year}
@@ -177,6 +172,11 @@ export default function Classes() {
                 {c.semester && (
                   <span className="badge badge-gray text-[10px]">
                     Sem {c.semester}
+                  </span>
+                )}
+                {c.section && (
+                  <span className="badge badge-gray text-[10px]">
+                    Sec {c.section}
                   </span>
                 )}
                 {c.session && (
