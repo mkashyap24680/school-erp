@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, Search, IdCard } from "lucide-react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import Modal from "../components/Modal";
 import BulkImportButton from "../components/BulkImportButton";
+import IdCardButton from "../components/IdCardButton";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
@@ -625,12 +626,7 @@ export default function Teachers() {
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-1">
 
-                        <button
-                          className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
-                          title="Generate ID Card"
-                        >
-                          <IdCard size={15} />
-                        </button>
+                        <IdCardButton person={teacher} type="Teacher" />
 
                         {canEdit && (
                           <button
