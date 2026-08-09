@@ -41,17 +41,23 @@ const SchoolClass = sequelize.define(
       allowNull: true,
     },
 
-    // Year, e.g. 1st Year, 2nd Year, 3rd Year, 4th Year
-    year: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
+   // Year, manually entered, e.g. 1st Year, 2nd Year
+year: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
 
-    // Academic session, e.g. 2026-27
-    session: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
+// Semester, manually entered, e.g. 1st Semester, 2nd Semester
+semester: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
+
+// Academic session, manually entered, e.g. 2026-27
+session: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
 
     // Class teacher
     teacher_id: {
