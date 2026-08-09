@@ -77,7 +77,7 @@ export default function Classes() {
   setError("");
 
   try {
-    const payload = {
+   const payload = {
   course_name: form.course_name,
   course_code: form.course_code || null,
   department_name: form.department_name,
