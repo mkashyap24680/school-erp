@@ -16,12 +16,13 @@ exports.getAllClasses = async (req, res) => {
         },
       ],
       order: [
-        ["course_name", "ASC"],
-        ["department_name", "ASC"],
-        ["year", "ASC"],
-        ["session", "DESC"],
-        ["section", "ASC"],
-      ],
+  ["course_name", "ASC"],
+  ["department_name", "ASC"],
+  ["year", "ASC"],
+  ["semester", "ASC"],
+  ["session", "DESC"],
+  ["section", "ASC"],
+],
     });
 
     const result = classes.map((c) => {
@@ -85,15 +86,16 @@ exports.getClassById = async (req, res) => {
 exports.createClass = async (req, res) => {
   try {
     const {
-      course_name,
-      course_code,
-      department_name,
-      department_code,
-      section,
-      year,
-      session,
-      teacher_id,
-    } = req.body;
+  course_name,
+  course_code,
+  department_name,
+  department_code,
+  section,
+  year,
+  semester,
+  session,
+  teacher_id,
+} = req.body;
 
     if (!course_name?.trim()) {
       return res.status(400).json({
@@ -108,23 +110,16 @@ exports.createClass = async (req, res) => {
     }
 
     const schoolClass = await SchoolClass.create({
-      course_name: course_name.trim(),
-      course_code: course_code?.trim() || null,
-      department_name: department_name.trim(),
-      department_code: department_code?.trim() || null,
-
-      // Section is optional
-      section: section?.trim() || null,
-
-      // Academic year
-      year: year?.trim() || null,
-
-      // Academic session
-      session: session?.trim() || null,
-
-      teacher_id: teacher_id || null,
-    });
-
+  course_name: course_name.trim(),
+  course_code: course_code?.trim() || null,
+  department_name: department_name.trim(),
+  department_code: department_code?.trim() || null,
+  section: section?.trim() || null,
+  year: year?.trim() || null,
+  semester: semester?.trim() || null,
+  session: session?.trim() || null,
+  teacher_id: teacher_id || null,
+});
     res.status(201).json(schoolClass);
   } catch (err) {
     console.error("createClass:", err);
@@ -148,16 +143,17 @@ exports.updateClass = async (req, res) => {
     }
 
     const {
-      course_name,
-      course_code,
-      department_name,
-      department_code,
-      section,
-      year,
-      session,
-      teacher_id,
-    } = req.body;
-
+  course_name,
+  course_code,
+  department_name,
+  department_code,
+  section,
+  year,
+  semester,
+  session,
+  teacher_id,
+} = req.body;
+    
     if (!course_name?.trim()) {
       return res.status(400).json({
         message: "Course name is required.",
@@ -171,23 +167,16 @@ exports.updateClass = async (req, res) => {
     }
 
     await schoolClass.update({
-      course_name: course_name.trim(),
-      course_code: course_code?.trim() || null,
-      department_name: department_name.trim(),
-      department_code: department_code?.trim() || null,
-
-      // Section is optional
-      section: section?.trim() || null,
-
-      // Academic year
-      year: year?.trim() || null,
-
-      // Academic session
-      session: session?.trim() || null,
-
-      teacher_id: teacher_id || null,
-    });
-
+  course_name: course_name.trim(),
+  course_code: course_code?.trim() || null,
+  department_name: department_name.trim(),
+  department_code: department_code?.trim() || null,
+  section: section?.trim() || null,
+  year: year?.trim() || null,
+  semester: semester?.trim() || null,
+  session: session?.trim() || null,
+  teacher_id: teacher_id || null,
+});
     res.json(schoolClass);
   } catch (err) {
     console.error("updateClass:", err);
