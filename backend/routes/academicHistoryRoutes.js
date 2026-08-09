@@ -1,4 +1,3 @@
-promoteStudent
 const express = require("express");
 const router = express.Router();
 
@@ -10,14 +9,27 @@ const {
 } = require("../controllers/academicHistoryController");
 
 // Get student's academic history
-router.get("/student/:studentId", getStudentAcademicHistory);
+router.get(
+  "/student/:studentId",
+  getStudentAcademicHistory
+);
 
 // Create academic history
-router.post("/", createAcademicHistory);
+router.post(
+  "/",
+  createAcademicHistory
+);
 
 // Update academic history
-router.put("/:id", updateAcademicHistory);
+router.put(
+  "/:id",
+  updateAcademicHistory
+);
+
+// Promote student
+router.post(
+  "/promote/:studentId",
+  promoteStudent
+);
 
 module.exports = router;
-// Promote student
-router.post("/promote/:studentId", promoteStudent);
