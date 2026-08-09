@@ -18,6 +18,8 @@ exports.getAllClasses = async (req, res) => {
       order: [
         ["course_name", "ASC"],
         ["department_name", "ASC"],
+        ["year", "ASC"],
+        ["session", "DESC"],
         ["section", "ASC"],
       ],
     });
@@ -70,6 +72,8 @@ exports.getClassById = async (req, res) => {
 
     res.json(schoolClass);
   } catch (err) {
+    console.error("getClassById:", err);
+
     res.status(500).json({
       message: "Failed to fetch class.",
       error: err.message,
@@ -86,6 +90,8 @@ exports.createClass = async (req, res) => {
       department_name,
       department_code,
       section,
+      year,
+      session,
       teacher_id,
     } = req.body;
 
@@ -106,7 +112,16 @@ exports.createClass = async (req, res) => {
       course_code: course_code?.trim() || null,
       department_name: department_name.trim(),
       department_code: department_code?.trim() || null,
+
+      // Section is optional
       section: section?.trim() || null,
+
+      // Academic year
+      year: year?.trim() || null,
+
+      // Academic session
+      session: session?.trim() || null,
+
       teacher_id: teacher_id || null,
     });
 
@@ -138,6 +153,8 @@ exports.updateClass = async (req, res) => {
       department_name,
       department_code,
       section,
+      year,
+      session,
       teacher_id,
     } = req.body;
 
@@ -158,7 +175,16 @@ exports.updateClass = async (req, res) => {
       course_code: course_code?.trim() || null,
       department_name: department_name.trim(),
       department_code: department_code?.trim() || null,
+
+      // Section is optional
       section: section?.trim() || null,
+
+      // Academic year
+      year: year?.trim() || null,
+
+      // Academic session
+      session: session?.trim() || null,
+
       teacher_id: teacher_id || null,
     });
 
