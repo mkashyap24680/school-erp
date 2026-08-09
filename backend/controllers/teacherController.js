@@ -4,7 +4,7 @@ const { Teacher, SchoolClass } = require("../models");
 exports.getAllTeachers = async (req, res) => {
   try {
     const teachers = await Teacher.findAll({
-      include: [{ model: SchoolClass, as: "classesHandled", attributes: ["id", "name", "section"] }],
+      include: [{ model: SchoolClass, as: "classesHandled", attributes: ["id", "course_name", "department_name", "section"] }],
       order: [["name", "ASC"]],
     });
     res.json(teachers);
