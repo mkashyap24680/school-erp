@@ -148,7 +148,7 @@ export default function Login() {
       value={form.password}
       onChange={handleChange}
       placeholder="••••••••"
-      className="form-input pl-11 pr-11"
+      className="form-input pl-9"
     />
 
     <button
