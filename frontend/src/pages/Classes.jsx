@@ -130,7 +130,7 @@ export default function Classes() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {classes.map((c) => (
-            <div key={c.id} className="card p-5">
+            <div key={c.id} className="card card-hover p-5">
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-navy-900 text-lg">
