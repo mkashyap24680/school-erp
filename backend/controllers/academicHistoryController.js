@@ -30,7 +30,7 @@ exports.getStudentAcademicHistory = async (req, res) => {
           ],
         },
       ],
-      order: [["session", "DESC"]],
+      order: [["start_date", "DESC"]],
     });
 
     res.json(history);
@@ -71,19 +71,19 @@ exports.createAcademicHistory = async (req, res) => {
       });
     }
 
-    if (!session) {
+    if (!session?.trim()) {
       return res.status(400).json({
         message: "Session is required.",
       });
     }
 
-    if (!year) {
+    if (!year?.trim()) {
       return res.status(400).json({
         message: "Year is required.",
       });
     }
 
-    if (!semester) {
+    if (!semester?.trim()) {
       return res.status(400).json({
         message: "Semester is required.",
       });
@@ -108,10 +108,10 @@ exports.createAcademicHistory = async (req, res) => {
     const history = await StudentAcademicHistory.create({
       student_id,
       class_id,
-      session,
-      year,
-      semester,
-      section: section || null,
+      session: session.trim(),
+      year: year.trim(),
+      semester: semester.trim(),
+      section: section?.trim() || null,
       start_date: start_date || null,
       end_date: end_date || null,
       status: status || "active",
@@ -153,8 +153,10 @@ exports.updateAcademicHistory = async (req, res) => {
 };
 
 // POST /api/academic-history/promote/:studentId
-// Promote one student to a new academic session/year/semester
+// Promote student to a new session/year/semester/class
 exports.promoteStudent = async (req, res) => {
+  const transaction = await sequelize.transaction();
+
   try {
     const { studentId } = req.params;
 
@@ -167,84 +169,147 @@ exports.promoteStudent = async (req, res) => {
       start_date,
     } = req.body;
 
-    // Validate required fields
+    // -----------------------------
+    // VALIDATION
+    // -----------------------------
+
     if (!class_id) {
+      await transaction.rollback();
+
       return res.status(400).json({
         message: "New class is required.",
       });
     }
 
-    if (!session) {
+    if (!session?.trim()) {
+      await transaction.rollback();
+
       return res.status(400).json({
         message: "New session is required.",
       });
     }
 
-    if (!year) {
+    if (!year?.trim()) {
+      await transaction.rollback();
+
       return res.status(400).json({
         message: "New year is required.",
       });
     }
 
-    if (!semester) {
+    if (!semester?.trim()) {
+      await transaction.rollback();
+
       return res.status(400).json({
         message: "New semester is required.",
       });
     }
 
-    // Check student
-    const student = await Student.findByPk(studentId);
+    // -----------------------------
+    // FIND STUDENT
+    // -----------------------------
+
+    const student = await Student.findByPk(studentId, {
+      transaction,
+    });
 
     if (!student) {
+      await transaction.rollback();
+
       return res.status(404).json({
         message: "Student not found.",
       });
     }
 
-    // Check new class
-    const newClass = await SchoolClass.findByPk(class_id);
+    // -----------------------------
+    // FIND NEW CLASS
+    // -----------------------------
+
+    const newClass = await SchoolClass.findByPk(class_id, {
+      transaction,
+    });
 
     if (!newClass) {
+      await transaction.rollback();
+
       return res.status(404).json({
         message: "New class not found.",
       });
     }
 
-    // Find current active academic record
+    // -----------------------------
+    // FIND CURRENT ACTIVE HISTORY
+    // -----------------------------
+
     const currentHistory = await StudentAcademicHistory.findOne({
       where: {
         student_id: studentId,
         status: "active",
       },
-      order: [["created_at", "DESC"]],
+      order: [["start_date", "DESC"]],
+      transaction,
     });
 
-    // Complete old academic record
+    // -----------------------------
+    // COMPLETE OLD HISTORY
+    // -----------------------------
+
     if (currentHistory) {
-      await currentHistory.update({
-        status: "completed",
-        end_date: start_date || new Date(),
-      });
+      await currentHistory.update(
+        {
+          status: "completed",
+          end_date: start_date || new Date(),
+        },
+        {
+          transaction,
+        }
+      );
     }
 
-    // Create new academic record
-    const newHistory = await StudentAcademicHistory.create({
-      student_id: studentId,
-      class_id,
-      session,
-      year,
-      semester,
-      section: section || null,
-      start_date: start_date || new Date(),
-      status: "active",
-    });
+    // -----------------------------
+    // CREATE NEW HISTORY
+    // -----------------------------
 
-    // Update student's current class
-    await student.update({
-      class_id,
-    });
+    const newHistory = await StudentAcademicHistory.create(
+      {
+        student_id: studentId,
+        class_id,
+        session: session.trim(),
+        year: year.trim(),
+        semester: semester.trim(),
+        section: section?.trim() || null,
+        start_date: start_date || new Date(),
+        end_date: null,
+        status: "active",
+      },
+      {
+        transaction,
+      }
+    );
 
-    // Return complete result
+    // -----------------------------
+    // UPDATE STUDENT CURRENT CLASS
+    // -----------------------------
+
+    await student.update(
+      {
+        class_id,
+      },
+      {
+        transaction,
+      }
+    );
+
+    // -----------------------------
+    // COMMIT
+    // -----------------------------
+
+    await transaction.commit();
+
+    // -----------------------------
+    // RETURN COMPLETE RESULT
+    // -----------------------------
+
     const result = await StudentAcademicHistory.findByPk(
       newHistory.id,
       {
@@ -273,6 +338,13 @@ exports.promoteStudent = async (req, res) => {
       history: result,
     });
   } catch (err) {
+    // Rollback only if transaction is still active
+    try {
+      await transaction.rollback();
+    } catch (rollbackError) {
+      console.error("Transaction rollback error:", rollbackError);
+    }
+
     console.error("promoteStudent:", err);
 
     res.status(500).json({
