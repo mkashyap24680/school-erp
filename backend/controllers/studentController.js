@@ -16,9 +16,10 @@ const classAttributes = [
   "course_code",
   "department_name",
   "department_code",
-  "section",
   "year",
+  "semester",
   "session",
+  "section",
 ];
 
 // GET /api/students
