@@ -52,6 +52,27 @@ Teacher.hasMany(SchoolClass, { foreignKey: "teacher_id", as: "classesHandled" })
 SchoolClass.hasMany(Student, { foreignKey: "class_id" });
 Student.belongsTo(SchoolClass, { foreignKey: "class_id" });
 
+// Student Academic History
+Student.hasMany(StudentAcademicHistory, {
+  foreignKey: "student_id",
+  as: "academicHistory",
+});
+
+StudentAcademicHistory.belongsTo(Student, {
+  foreignKey: "student_id",
+  as: "student",
+});
+
+SchoolClass.hasMany(StudentAcademicHistory, {
+  foreignKey: "class_id",
+  as: "academicHistory",
+});
+
+StudentAcademicHistory.belongsTo(SchoolClass, {
+  foreignKey: "class_id",
+  as: "class",
+});
+
 // Attendance
 Student.hasMany(Attendance, { foreignKey: "student_id" });
 Attendance.belongsTo(Student, { foreignKey: "student_id" });
@@ -130,6 +151,7 @@ module.exports = {
   SchoolClass,
   Teacher,
   Student,
+  StudentAcademicHistory,
   Attendance,
   Fee,
   Exam,
