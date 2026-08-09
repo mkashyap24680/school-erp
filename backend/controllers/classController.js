@@ -90,10 +90,10 @@ exports.createClass = async (req, res) => {
   course_code,
   department_name,
   department_code,
-  section,
   year,
   semester,
   session,
+  section,
   teacher_id,
 } = req.body;
 
@@ -109,15 +109,15 @@ exports.createClass = async (req, res) => {
       });
     }
 
-    const schoolClass = await SchoolClass.create({
+   const schoolClass = await SchoolClass.create({
   course_name: course_name.trim(),
   course_code: course_code?.trim() || null,
   department_name: department_name.trim(),
   department_code: department_code?.trim() || null,
-  section: section?.trim() || null,
   year: year?.trim() || null,
   semester: semester?.trim() || null,
   session: session?.trim() || null,
+  section: section?.trim() || null,
   teacher_id: teacher_id || null,
 });
     res.status(201).json(schoolClass);
@@ -147,10 +147,10 @@ exports.updateClass = async (req, res) => {
   course_code,
   department_name,
   department_code,
-  section,
   year,
   semester,
   session,
+  section,
   teacher_id,
 } = req.body;
     
@@ -171,10 +171,10 @@ exports.updateClass = async (req, res) => {
   course_code: course_code?.trim() || null,
   department_name: department_name.trim(),
   department_code: department_code?.trim() || null,
-  section: section?.trim() || null,
   year: year?.trim() || null,
   semester: semester?.trim() || null,
   session: session?.trim() || null,
+  section: section?.trim() || null,
   teacher_id: teacher_id || null,
 });
     res.json(schoolClass);
