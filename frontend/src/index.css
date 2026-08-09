@@ -685,3 +685,56 @@ html.dark .card-hover:hover {
   border-color: var(--color-brand-400);
   box-shadow: 0 0 0 3px rgba(63, 179, 80, 0.18);
 }
+
+
+/* =========================================================
+   PROMOTION MODAL - DARK MODE
+   ========================================================= */
+
+html.dark .bg-green-50 {
+  background-color: rgba(20, 83, 45, 0.25) !important;
+}
+
+html.dark .border-green-100 {
+  border-color: rgba(74, 222, 128, 0.18) !important;
+}
+
+html.dark .text-green-600 {
+  color: #4ade80 !important;
+}
+
+/* Yellow information box */
+html.dark .bg-yellow-50 {
+  background-color: rgba(113, 63, 18, 0.25) !important;
+}
+
+html.dark .border-yellow-100 {
+  border-color: rgba(250, 204, 21, 0.18) !important;
+}
+
+html.dark .text-yellow-800 {
+  color: #fde68a !important;
+}
+
+/* Red error box */
+html.dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.25) !important;
+}
+
+html.dark .border-red-100 {
+  border-color: rgba(248, 113, 113, 0.18) !important;
+}
+
+html.dark .text-red-600 {
+  color: #f87171 !important;
+}
+
+/* Readonly promotion fields */
+html.dark .bg-navy-900\/5 {
+  background-color: rgba(231, 235, 245, 0.05) !important;
+}
+
+html.dark input[readonly] {
+  color: #9aa4c4 !important;
+  cursor: not-allowed;
+}
