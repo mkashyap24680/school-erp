@@ -86,9 +86,20 @@ async function start() {
     await sequelize.authenticate();
     console.log("Database connected successfully.");
 
-    // Use { alter: true } during development to auto-sync schema changes.
-    await sequelize.sync({ alter: true });
-    console.log("Database synced.");
+    // IMPORTANT: { alter: true } was creating a new duplicate UNIQUE
+    // index on every restart (e.g. email_2, email_3, ...), eventually
+    // hitting MySQL's 64-key-per-table limit and crashing the server.
+    //
+    // Only run alter sync when explicitly enabled via env var
+    // (e.g. temporarily, while developing locally), never by default
+    // in production.
+    if (process.env.DB_SYNC_ALTER === "true") {
+      await sequelize.sync({ alter: true });
+      console.log("Database synced (alter mode).");
+    } else {
+      await sequelize.sync();
+      console.log("Database synced (safe mode - no alter).");
+    }
 
     app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
@@ -98,5 +109,4 @@ async function start() {
     process.exit(1);
   }
 }
-
 start();
