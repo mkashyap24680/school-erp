@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  RotateCcw,
+  GraduationCap,
+} from "lucide-react";
+
 import DashboardLayout from "../components/DashboardLayout";
 import Modal from "../components/Modal";
 import DataTable from "../components/DataTable";
@@ -23,6 +30,15 @@ const emptyForm = {
   guardian_user_id: "",
 };
 
+const emptyPromotionForm = {
+  class_id: "",
+  session: "",
+  year: "",
+  semester: "",
+  section: "",
+  start_date: "",
+};
+
 export default function Students() {
   const { user } = useAuth();
 
@@ -43,8 +59,21 @@ export default function Students() {
   const [error, setError] = useState("");
 
   // ---------------------------------------
+  // Promotion
+  // ---------------------------------------
+
+  const [promotionOpen, setPromotionOpen] = useState(false);
+  const [promotionStudent, setPromotionStudent] = useState(null);
+  const [promotionForm, setPromotionForm] = useState(
+    emptyPromotionForm
+  );
+  const [promotionSaving, setPromotionSaving] = useState(false);
+  const [promotionError, setPromotionError] = useState("");
+
+  // ---------------------------------------
   // Student filters
   // ---------------------------------------
+
   const [filters, setFilters] = useState({
     course: "",
     department: "",
@@ -53,6 +82,10 @@ export default function Students() {
     session: "",
     section: "",
   });
+
+  // ---------------------------------------
+  // Load students/classes/parents
+  // ---------------------------------------
 
   const load = () => {
     setLoading(true);
@@ -68,16 +101,23 @@ export default function Students() {
 
     Promise.all(calls)
       .then(([sRes, cRes, uRes]) => {
-        setStudents(sRes.data);
-        setClasses(cRes.data);
+        setStudents(sRes.data || []);
+        setClasses(cRes.data || []);
 
         if (uRes) {
           setParents(
-            uRes.data.filter((u) => u.role === "parent")
+            (uRes.data || []).filter(
+              (u) => u.role === "parent"
+            )
           );
         }
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        console.error("Students load:", err);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -87,6 +127,7 @@ export default function Students() {
   // ---------------------------------------
   // Create student
   // ---------------------------------------
+
   const openCreate = () => {
     setEditingId(null);
     setForm(emptyForm);
@@ -97,6 +138,7 @@ export default function Students() {
   // ---------------------------------------
   // Edit student
   // ---------------------------------------
+
   const openEdit = (s) => {
     setEditingId(s.id);
 
@@ -121,6 +163,7 @@ export default function Students() {
   // ---------------------------------------
   // Form change
   // ---------------------------------------
+
   const handleChange = (e) => {
     setForm({
       ...form,
@@ -131,6 +174,7 @@ export default function Students() {
   // ---------------------------------------
   // Save student
   // ---------------------------------------
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -145,7 +189,10 @@ export default function Students() {
       };
 
       if (editingId) {
-        await api.put(`/students/${editingId}`, payload);
+        await api.put(
+          `/students/${editingId}`,
+          payload
+        );
       } else {
         await api.post("/students", payload);
       }
@@ -155,7 +202,7 @@ export default function Students() {
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        "Failed to save student."
+          "Failed to save student."
       );
     } finally {
       setSaving(false);
@@ -165,6 +212,7 @@ export default function Students() {
   // ---------------------------------------
   // Delete student
   // ---------------------------------------
+
   const handleDelete = async (id) => {
     if (
       !window.confirm(
@@ -174,13 +222,21 @@ export default function Students() {
       return;
     }
 
-    await api.delete(`/students/${id}`);
-    load();
+    try {
+      await api.delete(`/students/${id}`);
+      load();
+    } catch (err) {
+      window.alert(
+        err.response?.data?.message ||
+          "Failed to delete student."
+      );
+    }
   };
 
   // ---------------------------------------
   // Filter change
   // ---------------------------------------
+
   const handleFilterChange = (e) => {
     setFilters({
       ...filters,
@@ -191,6 +247,7 @@ export default function Students() {
   // ---------------------------------------
   // Reset filters
   // ---------------------------------------
+
   const resetFilters = () => {
     setFilters({
       course: "",
@@ -203,63 +260,83 @@ export default function Students() {
   };
 
   // ---------------------------------------
-  // Unique filter options
+  // Filter options
   // ---------------------------------------
 
   const courseOptions = useMemo(() => {
-    return [...new Set(
-      classes
-        .map((c) => c.course_name)
-        .filter(Boolean)
-    )].sort();
+    return [
+      ...new Set(
+        classes
+          .map((c) => c.course_name)
+          .filter(Boolean)
+      ),
+    ].sort();
   }, [classes]);
 
   const departmentOptions = useMemo(() => {
-    return [...new Set(
-      classes
-        .filter((c) =>
-          !filters.course ||
-          c.course_name === filters.course
-        )
-        .map((c) => c.department_name)
-        .filter(Boolean)
-    )].sort();
+    return [
+      ...new Set(
+        classes
+          .filter(
+            (c) =>
+              !filters.course ||
+              c.course_name === filters.course
+          )
+          .map((c) => c.department_name)
+          .filter(Boolean)
+      ),
+    ].sort();
   }, [classes, filters.course]);
 
   const yearOptions = useMemo(() => {
-    return [...new Set(
-      classes
-        .filter((c) =>
-          !filters.course ||
-          c.course_name === filters.course
-        )
-        .filter((c) =>
-          !filters.department ||
-          c.department_name === filters.department
-        )
-        .map((c) => c.year)
-        .filter(Boolean)
-    )].sort();
-  }, [classes, filters.course, filters.department]);
+    return [
+      ...new Set(
+        classes
+          .filter(
+            (c) =>
+              !filters.course ||
+              c.course_name === filters.course
+          )
+          .filter(
+            (c) =>
+              !filters.department ||
+              c.department_name ===
+                filters.department
+          )
+          .map((c) => c.year)
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [
+    classes,
+    filters.course,
+    filters.department,
+  ]);
 
   const semesterOptions = useMemo(() => {
-    return [...new Set(
-      classes
-        .filter((c) =>
-          !filters.course ||
-          c.course_name === filters.course
-        )
-        .filter((c) =>
-          !filters.department ||
-          c.department_name === filters.department
-        )
-        .filter((c) =>
-          !filters.year ||
-          c.year === filters.year
-        )
-        .map((c) => c.semester)
-        .filter(Boolean)
-    )].sort();
+    return [
+      ...new Set(
+        classes
+          .filter(
+            (c) =>
+              !filters.course ||
+              c.course_name === filters.course
+          )
+          .filter(
+            (c) =>
+              !filters.department ||
+              c.department_name ===
+                filters.department
+          )
+          .filter(
+            (c) =>
+              !filters.year ||
+              c.year === filters.year
+          )
+          .map((c) => c.semester)
+          .filter(Boolean)
+      ),
+    ].sort();
   }, [
     classes,
     filters.course,
@@ -268,27 +345,36 @@ export default function Students() {
   ]);
 
   const sessionOptions = useMemo(() => {
-    return [...new Set(
-      classes
-        .filter((c) =>
-          !filters.course ||
-          c.course_name === filters.course
-        )
-        .filter((c) =>
-          !filters.department ||
-          c.department_name === filters.department
-        )
-        .filter((c) =>
-          !filters.year ||
-          c.year === filters.year
-        )
-        .filter((c) =>
-          !filters.semester ||
-          c.semester === filters.semester
-        )
-        .map((c) => c.session)
-        .filter(Boolean)
-    )].sort().reverse();
+    return [
+      ...new Set(
+        classes
+          .filter(
+            (c) =>
+              !filters.course ||
+              c.course_name === filters.course
+          )
+          .filter(
+            (c) =>
+              !filters.department ||
+              c.department_name ===
+                filters.department
+          )
+          .filter(
+            (c) =>
+              !filters.year ||
+              c.year === filters.year
+          )
+          .filter(
+            (c) =>
+              !filters.semester ||
+              c.semester === filters.semester
+          )
+          .map((c) => c.session)
+          .filter(Boolean)
+      ),
+    ]
+      .sort()
+      .reverse();
   }, [
     classes,
     filters.course,
@@ -298,31 +384,39 @@ export default function Students() {
   ]);
 
   const sectionOptions = useMemo(() => {
-    return [...new Set(
-      classes
-        .filter((c) =>
-          !filters.course ||
-          c.course_name === filters.course
-        )
-        .filter((c) =>
-          !filters.department ||
-          c.department_name === filters.department
-        )
-        .filter((c) =>
-          !filters.year ||
-          c.year === filters.year
-        )
-        .filter((c) =>
-          !filters.semester ||
-          c.semester === filters.semester
-        )
-        .filter((c) =>
-          !filters.session ||
-          c.session === filters.session
-        )
-        .map((c) => c.section)
-        .filter(Boolean)
-    )].sort();
+    return [
+      ...new Set(
+        classes
+          .filter(
+            (c) =>
+              !filters.course ||
+              c.course_name === filters.course
+          )
+          .filter(
+            (c) =>
+              !filters.department ||
+              c.department_name ===
+                filters.department
+          )
+          .filter(
+            (c) =>
+              !filters.year ||
+              c.year === filters.year
+          )
+          .filter(
+            (c) =>
+              !filters.semester ||
+              c.semester === filters.semester
+          )
+          .filter(
+            (c) =>
+              !filters.session ||
+              c.session === filters.session
+          )
+          .map((c) => c.section)
+          .filter(Boolean)
+      ),
+    ].sort();
   }, [
     classes,
     filters.course,
@@ -335,6 +429,7 @@ export default function Students() {
   // ---------------------------------------
   // Filter students
   // ---------------------------------------
+
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
       const c = student.SchoolClass;
@@ -397,16 +492,92 @@ export default function Students() {
   }, [students, filters]);
 
   // ---------------------------------------
-  // Student table columns
+  // Open promotion modal
   // ---------------------------------------
+
+  const openPromotion = (student) => {
+    setPromotionStudent(student);
+
+    setPromotionForm({
+      class_id: "",
+      session: "",
+      year: "",
+      semester: "",
+      section: "",
+      start_date: "",
+    });
+
+    setPromotionError("");
+    setPromotionOpen(true);
+  };
+
+  // ---------------------------------------
+  // Promotion form change
+  // ---------------------------------------
+
+  const handlePromotionChange = (e) => {
+    const { name, value } = e.target;
+
+    setPromotionForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // ---------------------------------------
+  // Promote student
+  // ---------------------------------------
+
+  const handlePromotion = async (e) => {
+    e.preventDefault();
+
+    if (!promotionStudent) return;
+
+    setPromotionSaving(true);
+    setPromotionError("");
+
+    try {
+      const payload = {
+        class_id: promotionForm.class_id,
+        session: promotionForm.session,
+        year: promotionForm.year,
+        semester: promotionForm.semester,
+        section: promotionForm.section || null,
+        start_date:
+          promotionForm.start_date || null,
+      };
+
+      await api.post(
+        `/academic-history/promote/${promotionStudent.id}`,
+        payload
+      );
+
+      setPromotionOpen(false);
+      setPromotionStudent(null);
+
+      load();
+    } catch (err) {
+      setPromotionError(
+        err.response?.data?.message ||
+          "Failed to promote student."
+      );
+    } finally {
+      setPromotionSaving(false);
+    }
+  };
+
+  // ---------------------------------------
+  // Table columns
+  // ---------------------------------------
+
   const columns = [
     {
       key: "name",
       label: "Name",
       render: (s) => (
-        <span className="font-medium">
+        <div className="font-medium">
           {s.name}
-        </span>
+        </div>
       ),
     },
 
@@ -495,8 +666,7 @@ export default function Students() {
   ];
 
   return (
-    <DashboardLayout title="Students">
-
+    <DashboardLayout>
       <div className="card p-4 sm:p-5">
 
         {/* -------------------------------- */}
@@ -512,8 +682,14 @@ export default function Students() {
               expectedColumns={[
                 { key: "name", label: "name" },
                 { key: "email", label: "email" },
-                { key: "roll_no", label: "roll_no" },
-                { key: "admission_no", label: "admission_no" },
+                {
+                  key: "roll_no",
+                  label: "roll_no",
+                },
+                {
+                  key: "admission_no",
+                  label: "admission_no",
+                },
               ]}
               onDone={load}
             />
@@ -522,7 +698,7 @@ export default function Students() {
           {canEdit && (
             <button
               onClick={openCreate}
-              className="btn-primary"
+              className="btn-primary flex items-center gap-1.5"
             >
               <Plus size={16} />
               Add Student
@@ -563,8 +739,6 @@ export default function Students() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
 
-            {/* Course */}
-
             <div>
               <label className="form-label">
                 Course
@@ -590,8 +764,6 @@ export default function Students() {
                 ))}
               </select>
             </div>
-
-            {/* Department */}
 
             <div>
               <label className="form-label">
@@ -621,8 +793,6 @@ export default function Students() {
               </select>
             </div>
 
-            {/* Year */}
-
             <div>
               <label className="form-label">
                 Year
@@ -648,8 +818,6 @@ export default function Students() {
                 ))}
               </select>
             </div>
-
-            {/* Semester */}
 
             <div>
               <label className="form-label">
@@ -679,8 +847,6 @@ export default function Students() {
               </select>
             </div>
 
-            {/* Session */}
-
             <div>
               <label className="form-label">
                 Session
@@ -706,8 +872,6 @@ export default function Students() {
                 ))}
               </select>
             </div>
-
-            {/* Section */}
 
             <div>
               <label className="form-label">
@@ -737,8 +901,6 @@ export default function Students() {
 
           </div>
 
-          {/* Filter result count */}
-
           <div className="mt-3 text-xs text-navy-900/50">
             Showing{" "}
             <span className="font-semibold text-navy-900">
@@ -767,6 +929,7 @@ export default function Students() {
             rows={filteredStudents}
             searchPlaceholder="Search students..."
             exportFileName="students"
+
             actionsColumn={(s) => (
               <div className="flex gap-1">
 
@@ -780,7 +943,9 @@ export default function Students() {
                   studentName={s.name}
                   className={
                     s.SchoolClass
-                      ? `${s.SchoolClass.course_name || ""}${s.SchoolClass.section || ""}`
+                      ? `${s.SchoolClass.course_name || ""}${
+                          s.SchoolClass.section || ""
+                        }`
                       : ""
                   }
                   fetchUrl={`/exams/results/student/${s.id}`}
@@ -788,8 +953,21 @@ export default function Students() {
 
                 {canEdit && (
                   <button
+                    onClick={() =>
+                      openPromotion(s)
+                    }
+                    className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"
+                    title="Promote Student"
+                  >
+                    <GraduationCap size={15} />
+                  </button>
+                )}
+
+                {canEdit && (
+                  <button
                     onClick={() => openEdit(s)}
                     className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
+                    title="Edit Student"
                   >
                     <Pencil size={15} />
                   </button>
@@ -797,8 +975,11 @@ export default function Students() {
 
                 {canDelete && (
                   <button
-                    onClick={() => handleDelete(s.id)}
+                    onClick={() =>
+                      handleDelete(s.id)
+                    }
                     className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                    title="Delete Student"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -825,7 +1006,6 @@ export default function Students() {
         }
         wide
       >
-
         <form
           onSubmit={handleSubmit}
           className="space-y-4"
@@ -892,8 +1072,6 @@ export default function Students() {
                 className="form-input"
               />
             </div>
-
-            {/* Complete Class */}
 
             <div className="sm:col-span-2">
               <label className="form-label">
@@ -1045,7 +1223,9 @@ export default function Students() {
 
             <button
               type="button"
-              onClick={() => setModalOpen(false)}
+              onClick={() =>
+                setModalOpen(false)
+              }
               className="btn-outline"
             >
               Cancel
@@ -1064,7 +1244,222 @@ export default function Students() {
           </div>
 
         </form>
+      </Modal>
 
+      {/* -------------------------------- */}
+      {/* Promotion Modal */}
+      {/* -------------------------------- */}
+
+      <Modal
+        open={promotionOpen}
+        onClose={() => {
+          if (!promotionSaving) {
+            setPromotionOpen(false);
+          }
+        }}
+        title="Promote Student"
+        wide
+      >
+        <form
+          onSubmit={handlePromotion}
+          className="space-y-4"
+        >
+
+          {promotionStudent && (
+            <div className="rounded-xl bg-green-50 border border-green-100 p-4">
+
+              <div className="font-semibold text-navy-900">
+                {promotionStudent.name}
+              </div>
+
+              <div className="text-xs text-navy-900/60 mt-1">
+                Roll No:{" "}
+                {promotionStudent.roll_no ||
+                  "—"}
+              </div>
+
+              {promotionStudent.SchoolClass && (
+                <div className="text-xs text-navy-900/60 mt-1">
+                  Current Class:{" "}
+                  {[
+                    promotionStudent.SchoolClass
+                      .course_name,
+                    promotionStudent.SchoolClass
+                      .department_name,
+                    promotionStudent.SchoolClass
+                      .year,
+                    promotionStudent.SchoolClass
+                      .semester,
+                    promotionStudent.SchoolClass
+                      .session,
+                    promotionStudent.SchoolClass
+                      .section
+                      ? `Section ${promotionStudent.SchoolClass.section}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" — ")}
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {promotionError && (
+            <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">
+              {promotionError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+            <div className="sm:col-span-2">
+              <label className="form-label">
+                New Class
+              </label>
+
+              <select
+                name="class_id"
+                required
+                value={promotionForm.class_id}
+                onChange={handlePromotionChange}
+                className="form-input"
+              >
+                <option value="">
+                  Select New Class
+                </option>
+
+                {classes.map((c) => (
+                  <option
+                    key={c.id}
+                    value={c.id}
+                  >
+                    {[
+                      c.course_name,
+                      c.department_name,
+                      c.year,
+                      c.semester,
+                      c.session,
+                      c.section
+                        ? `Section ${c.section}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" — ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">
+                New Session
+              </label>
+
+              <input
+                name="session"
+                required
+                value={promotionForm.session}
+                onChange={handlePromotionChange}
+                placeholder="2027-28"
+                className="form-input"
+              />
+            </div>
+
+            <div>
+              <label className="form-label">
+                New Year
+              </label>
+
+              <input
+                name="year"
+                required
+                value={promotionForm.year}
+                onChange={handlePromotionChange}
+                placeholder="2nd Year"
+                className="form-input"
+              />
+            </div>
+
+            <div>
+              <label className="form-label">
+                New Semester
+              </label>
+
+              <input
+                name="semester"
+                required
+                value={promotionForm.semester}
+                onChange={handlePromotionChange}
+                placeholder="3rd Semester"
+                className="form-input"
+              />
+            </div>
+
+            <div>
+              <label className="form-label">
+                Section
+              </label>
+
+              <input
+                name="section"
+                value={promotionForm.section}
+                onChange={handlePromotionChange}
+                placeholder="A"
+                className="form-input"
+              />
+            </div>
+
+            <div>
+              <label className="form-label">
+                Promotion Start Date
+              </label>
+
+              <input
+                type="date"
+                name="start_date"
+                value={promotionForm.start_date}
+                onChange={handlePromotionChange}
+                className="form-input"
+              />
+            </div>
+
+          </div>
+
+          <div className="rounded-lg bg-yellow-50 border border-yellow-100 p-3 text-xs text-yellow-800">
+            Promotion karne par current academic
+            record <b>completed</b> hoga aur new
+            academic record <b>active</b> ho jayega.
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+
+            <button
+              type="button"
+              disabled={promotionSaving}
+              onClick={() =>
+                setPromotionOpen(false)
+              }
+              className="btn-outline"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              disabled={promotionSaving}
+              className="btn-primary flex items-center gap-1.5"
+            >
+              <GraduationCap size={16} />
+
+              {promotionSaving
+                ? "Promoting..."
+                : "Promote Student"}
+            </button>
+
+          </div>
+
+        </form>
       </Modal>
 
     </DashboardLayout>
