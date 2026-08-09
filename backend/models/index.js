@@ -3,6 +3,7 @@ const User = require("./User");
 const SchoolClass = require("./SchoolClass");
 const Teacher = require("./Teacher");
 const Student = require("./Student");
+const StudentAcademicHistory = require("./StudentAcademicHistory");
 const Attendance = require("./Attendance");
 const Fee = require("./Fee");
 const Exam = require("./Exam");
