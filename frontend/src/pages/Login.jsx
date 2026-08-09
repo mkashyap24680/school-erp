@@ -140,7 +140,7 @@ export default function Login() {
 
   <div className="relative">
     
-
+<Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-900/40" />
     <input
       type={showPassword ? "text" : "password"}
       name="password"
