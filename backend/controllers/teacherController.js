@@ -9,6 +9,7 @@ exports.getAllTeachers = async (req, res) => {
     });
     res.json(teachers);
   } catch (err) {
+    console.error("getAllTeachers error:", err);
     res.status(500).json({ message: "Failed to fetch teachers.", error: err.message });
   }
 };
@@ -22,6 +23,7 @@ exports.getTeacherById = async (req, res) => {
     if (!teacher) return res.status(404).json({ message: "Teacher not found." });
     res.json(teacher);
   } catch (err) {
+    console.error("getTeacherById error:", err);
     res.status(500).json({ message: "Failed to fetch teacher.", error: err.message });
   }
 };
@@ -36,6 +38,7 @@ exports.getMyTeacherProfile = async (req, res) => {
     if (!teacher) return res.status(404).json({ message: "Teacher profile not found." });
     res.json(teacher);
   } catch (err) {
+    console.error("getMyTeacherProfile error:", err);
     res.status(500).json({ message: "Failed to fetch profile.", error: err.message });
   }
 };
@@ -43,9 +46,13 @@ exports.getMyTeacherProfile = async (req, res) => {
 // POST /api/teachers  (admin, management)
 exports.createTeacher = async (req, res) => {
   try {
-    const teacher = await Teacher.create(req.body);
+    const payload = { ...req.body };
+    if (!payload.joining_date) payload.joining_date = null;
+
+    const teacher = await Teacher.create(payload);
     res.status(201).json(teacher);
   } catch (err) {
+    console.error("createTeacher error:", err);
     res.status(500).json({ message: "Failed to create teacher.", error: err.message });
   }
 };
@@ -55,9 +62,14 @@ exports.updateTeacher = async (req, res) => {
   try {
     const teacher = await Teacher.findByPk(req.params.id);
     if (!teacher) return res.status(404).json({ message: "Teacher not found." });
-    await teacher.update(req.body);
+
+    const payload = { ...req.body };
+    if (!payload.joining_date) payload.joining_date = null;
+
+    await teacher.update(payload);
     res.json(teacher);
   } catch (err) {
+    console.error("updateTeacher error:", err);
     res.status(500).json({ message: "Failed to update teacher.", error: err.message });
   }
 };
@@ -74,8 +86,10 @@ exports.bulkCreateTeachers = async (req, res) => {
     const errors = [];
     for (let i = 0; i < teachers.length; i++) {
       try {
-        const row = teachers[i];
+        const row = { ...teachers[i] };
         if (!row.name) { errors.push({ row: i + 1, error: "Missing name" }); continue; }
+        if (!row.joining_date) row.joining_date = null;
+
         const teacher = await Teacher.create(row);
         created.push(teacher);
       } catch (err) {
@@ -85,6 +99,7 @@ exports.bulkCreateTeachers = async (req, res) => {
 
     res.status(201).json({ created: created.length, errors });
   } catch (err) {
+    console.error("bulkCreateTeachers error:", err);
     res.status(500).json({ message: "Bulk import failed.", error: err.message });
   }
 };
@@ -97,6 +112,7 @@ exports.deleteTeacher = async (req, res) => {
     await teacher.destroy();
     res.json({ message: "Teacher deleted." });
   } catch (err) {
+    console.error("deleteTeacher error:", err);
     res.status(500).json({ message: "Failed to delete teacher.", error: err.message });
   }
 };
