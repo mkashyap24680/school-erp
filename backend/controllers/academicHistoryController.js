@@ -4,6 +4,8 @@ const {
   SchoolClass,
 } = require("../models");
 
+const sequelize = require("../config/db");
+
 // GET /api/academic-history/student/:studentId
 exports.getStudentAcademicHistory = async (req, res) => {
   try {
