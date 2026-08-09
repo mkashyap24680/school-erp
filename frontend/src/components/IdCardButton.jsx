@@ -62,6 +62,7 @@ export default function IdCardButton({
         open={open}
         onClose={() => setOpen(false)}
         title={`${type} ID Card`}
+        wide
       >
         <div className="flex flex-col items-center gap-4">
 
@@ -69,7 +70,8 @@ export default function IdCardButton({
           <div
             ref={cardRef}
             style={{
-              width: "520px",
+              width: "100%",
+              maxWidth: "520px",
               minHeight: "420px",
               background: "#fff",
               borderRadius: "12px",
