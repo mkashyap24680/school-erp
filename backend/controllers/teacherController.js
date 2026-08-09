@@ -53,7 +53,17 @@ exports.createTeacher = async (req, res) => {
     res.status(201).json(teacher);
   } catch (err) {
     console.error("createTeacher error:", err);
-    res.status(500).json({ message: "Failed to create teacher.", error: err.message });
+
+    const details = err.errors
+      ? err.errors.map((e) => ({ field: e.path, message: e.message, value: e.value }))
+      : undefined;
+
+    res.status(500).json({
+      message: "Failed to create teacher.",
+      error: err.message,
+      details,
+      original: err.original?.sqlMessage,
+    });
   }
 };
 
