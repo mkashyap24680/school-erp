@@ -128,62 +128,66 @@ export default function Classes() {
       ) : classes.length === 0 ? (
         <div className="card p-8 text-center text-navy-900/40 text-sm">No classes created yet.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {classes.map((c) => (
-            <div key={c.id} className="card card-hover p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-bold text-navy-900 text-lg">
-                        {c.course_name}
-                      </h3>
-                      
-                      <p className="text-sm text-navy-900/60 mt-1">
-                        {c.course_code || "Course"}
-                      </p>
-                      
-                      <p className="text-sm text-navy-900/70 mt-3">
-                        {c.department_name}
-                        {c.department_code && ` (${c.department_code})`}
-                      </p>
-                      
-                      {c.section && (
-                        <p className="text-sm text-navy-900/50 mt-1">
-                          Section: {c.section}
-                        </p>
-                      )}
-                      {c.year && (
-                          <p className="text-sm text-navy-900/60 mt-1">
-                            Year: {c.year}
-                          </p>
-                        )}
-                        {c.semester && (
-  <p className="text-sm text-navy-900/60 mt-1">
-    Semester: {c.semester}
-  </p>
-)}
-                        {c.session && (
-                          <p className="text-sm text-navy-900/60 mt-1">
-                            Session: {c.session}
-                          </p>
-                        )}
+            <div key={c.id} className="card card-hover p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-navy-900 text-base truncate">
+                    {c.course_name}
+                  </h3>
+
+                  <p className="text-xs text-navy-900/50 mt-0.5">
+                    {c.course_code || "Course"}
+                  </p>
                 </div>
+
                 {(canEdit || canDelete) && (
-                  <div className="flex gap-1">
+                  <div className="flex gap-0.5 shrink-0">
                     {canEdit && (
-                      <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
-                        <Pencil size={15} />
+                      <button onClick={() => openEdit(c)} className="p-1 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
+                        <Pencil size={13} />
                       </button>
                     )}
                     {canDelete && (
-                      <button onClick={() => handleDelete(c.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
-                        <Trash2 size={15} />
+                      <button onClick={() => handleDelete(c.id)} className="p-1 rounded-lg hover:bg-red-50 text-red-500">
+                        <Trash2 size={13} />
                       </button>
                     )}
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 mt-4 text-sm text-navy-900/60">
-                <Users2 size={16} /> {c.studentCount ?? 0} students
+
+              <p className="text-xs text-navy-900/70 mt-2 truncate">
+                {c.department_name}
+                {c.department_code && ` (${c.department_code})`}
+              </p>
+
+              <div className="flex flex-wrap gap-1.5 mt-2.5">
+                {c.section && (
+                  <span className="badge badge-gray text-[10px]">
+                    Sec {c.section}
+                  </span>
+                )}
+                {c.year && (
+                  <span className="badge badge-gray text-[10px]">
+                    {c.year}
+                  </span>
+                )}
+                {c.semester && (
+                  <span className="badge badge-gray text-[10px]">
+                    Sem {c.semester}
+                  </span>
+                )}
+                {c.session && (
+                  <span className="badge badge-gray text-[10px]">
+                    {c.session}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-navy-900/5 text-xs text-navy-900/60">
+                <Users2 size={13} /> {c.studentCount ?? 0} students
               </div>
             </div>
           ))}
