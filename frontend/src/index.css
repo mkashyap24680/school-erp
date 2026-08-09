@@ -630,3 +630,18 @@ html.dark .form-input {
 html.dark .form-input::placeholder {
   color: #7c8499;
 }
+
+/* =========================================================
+   DARK MODE - CATCH-ALL FIX
+   (fixes text/borders using navy-900 opacity utilities
+   like text-navy-900/10, /20, /30, /80, /90 etc. that
+   weren't individually overridden above)
+   ========================================================= */
+
+html.dark [class*="text-navy-900"] {
+  color: #e7ebf5 !important;
+}
+
+html.dark [class*="border-navy-900"] {
+  border-color: rgba(231, 235, 245, 0.14) !important;
+}
