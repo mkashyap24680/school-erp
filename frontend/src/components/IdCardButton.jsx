@@ -296,6 +296,8 @@ export default function IdCardButton({
                   columnGap: 20,
                   rowGap: 5,
                   fontSize: 11,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
                 }}
               >
                 {person.dob && (
@@ -340,6 +342,8 @@ export default function IdCardButton({
                   style={{
                     marginTop: 7,
                     fontSize: 11,
+                    wordBreak: "break-word",
+                    overflowWrap: "anywhere",
                   }}
                 >
                   Address: <b>{person.address}</b>
