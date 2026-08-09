@@ -32,15 +32,15 @@ const Student = sequelize.define("Student", {
     allowNull: false,
   },
   email: {
-    type: DataTypes.STRING,
-  },
-  phone: {
   type: DataTypes.STRING,
 },
 
-photo: {
+phone: {
   type: DataTypes.STRING,
-  allowNull: true,
+},
+
+roll_no: {
+  type: DataTypes.STRING,
 },
   dob: {
     type: DataTypes.DATEONLY,
