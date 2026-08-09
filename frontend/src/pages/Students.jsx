@@ -300,8 +300,7 @@ export default function Students() {
           .filter(
             (c) =>
               !filters.department ||
-              c.department_name ===
-                filters.department
+              c.department_name === filters.department
           )
           .map((c) => c.year)
           .filter(Boolean)
@@ -325,8 +324,7 @@ export default function Students() {
           .filter(
             (c) =>
               !filters.department ||
-              c.department_name ===
-                filters.department
+              c.department_name === filters.department
           )
           .filter(
             (c) =>
@@ -356,8 +354,7 @@ export default function Students() {
           .filter(
             (c) =>
               !filters.department ||
-              c.department_name ===
-                filters.department
+              c.department_name === filters.department
           )
           .filter(
             (c) =>
@@ -395,8 +392,7 @@ export default function Students() {
           .filter(
             (c) =>
               !filters.department ||
-              c.department_name ===
-                filters.department
+              c.department_name === filters.department
           )
           .filter(
             (c) =>
@@ -509,6 +505,41 @@ export default function Students() {
 
     setPromotionError("");
     setPromotionOpen(true);
+  };
+
+  // ---------------------------------------
+  // Promotion class change
+  // ---------------------------------------
+  // New Class select karte hi:
+  // Session
+  // Year
+  // Semester
+  // Section
+  // automatically fill ho jayenge.
+  // ---------------------------------------
+
+  const handlePromotionClassChange = (e) => {
+    const classId = e.target.value;
+
+    const selectedClass = classes.find(
+      (c) => String(c.id) === String(classId)
+    );
+
+    if (!selectedClass) {
+      setPromotionForm({
+        ...emptyPromotionForm,
+      });
+      return;
+    }
+
+    setPromotionForm((prev) => ({
+      ...prev,
+      class_id: classId,
+      session: selectedClass.session || "",
+      year: selectedClass.year || "",
+      semester: selectedClass.semester || "",
+      section: selectedClass.section || "",
+    }));
   };
 
   // ---------------------------------------
@@ -667,330 +698,311 @@ export default function Students() {
 
   return (
     <DashboardLayout>
-      <div className="card p-4 sm:p-5">
+      {/* -------------------------------- */}
+      {/* Top actions */}
+      {/* -------------------------------- */}
 
-        {/* -------------------------------- */}
-        {/* Top actions */}
-        {/* -------------------------------- */}
-
-        <div className="flex justify-end mb-4 gap-2">
-
-          {canEdit && (
-            <BulkImportButton
-              endpoint="/students/bulk"
-              payloadKey="students"
-              expectedColumns={[
-                { key: "name", label: "name" },
-                { key: "email", label: "email" },
-                {
-                  key: "roll_no",
-                  label: "roll_no",
-                },
-                {
-                  key: "admission_no",
-                  label: "admission_no",
-                },
-              ]}
-              onDone={load}
-            />
-          )}
-
-          {canEdit && (
-            <button
-              onClick={openCreate}
-              className="btn-primary flex items-center gap-1.5"
-            >
-              <Plus size={16} />
-              Add Student
-            </button>
-          )}
-
-        </div>
-
-        {/* -------------------------------- */}
-        {/* Filters */}
-        {/* -------------------------------- */}
-
-        <div className="border border-[#eef0f4] rounded-xl p-4 mb-5">
-
-          <div className="flex items-center justify-between mb-3">
-
-            <div>
-              <h3 className="font-semibold text-navy-900">
-                Student Filters
-              </h3>
-
-              <p className="text-xs text-navy-900/50 mt-0.5">
-                Filter students by course, department,
-                year, semester, session and section.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="btn-outline text-sm flex items-center gap-1.5"
-            >
-              <RotateCcw size={14} />
-              Reset
-            </button>
-
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-
-            <div>
-              <label className="form-label">
-                Course
-              </label>
-
-              <select
-                name="course"
-                value={filters.course}
-                onChange={handleFilterChange}
-                className="form-input"
-              >
-                <option value="">
-                  All Courses
-                </option>
-
-                {courseOptions.map((course) => (
-                  <option
-                    key={course}
-                    value={course}
-                  >
-                    {course}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">
-                Department
-              </label>
-
-              <select
-                name="department"
-                value={filters.department}
-                onChange={handleFilterChange}
-                className="form-input"
-              >
-                <option value="">
-                  All Departments
-                </option>
-
-                {departmentOptions.map(
-                  (department) => (
-                    <option
-                      key={department}
-                      value={department}
-                    >
-                      {department}
-                    </option>
-                  )
-                )}
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">
-                Year
-              </label>
-
-              <select
-                name="year"
-                value={filters.year}
-                onChange={handleFilterChange}
-                className="form-input"
-              >
-                <option value="">
-                  All Years
-                </option>
-
-                {yearOptions.map((year) => (
-                  <option
-                    key={year}
-                    value={year}
-                  >
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">
-                Semester
-              </label>
-
-              <select
-                name="semester"
-                value={filters.semester}
-                onChange={handleFilterChange}
-                className="form-input"
-              >
-                <option value="">
-                  All Semesters
-                </option>
-
-                {semesterOptions.map(
-                  (semester) => (
-                    <option
-                      key={semester}
-                      value={semester}
-                    >
-                      {semester}
-                    </option>
-                  )
-                )}
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">
-                Session
-              </label>
-
-              <select
-                name="session"
-                value={filters.session}
-                onChange={handleFilterChange}
-                className="form-input"
-              >
-                <option value="">
-                  All Sessions
-                </option>
-
-                {sessionOptions.map((session) => (
-                  <option
-                    key={session}
-                    value={session}
-                  >
-                    {session}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">
-                Section
-              </label>
-
-              <select
-                name="section"
-                value={filters.section}
-                onChange={handleFilterChange}
-                className="form-input"
-              >
-                <option value="">
-                  All Sections
-                </option>
-
-                {sectionOptions.map((section) => (
-                  <option
-                    key={section}
-                    value={section}
-                  >
-                    Section {section}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-          </div>
-
-          <div className="mt-3 text-xs text-navy-900/50">
-            Showing{" "}
-            <span className="font-semibold text-navy-900">
-              {filteredStudents.length}
-            </span>{" "}
-            of{" "}
-            <span className="font-semibold text-navy-900">
-              {students.length}
-            </span>{" "}
-            students
-          </div>
-
-        </div>
-
-        {/* -------------------------------- */}
-        {/* Student table */}
-        {/* -------------------------------- */}
-
-        {loading ? (
-          <div className="text-center py-8 text-navy-900/40 text-sm">
-            Loading...
-          </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            rows={filteredStudents}
-            searchPlaceholder="Search students..."
-            exportFileName="students"
-
-            actionsColumn={(s) => (
-              <div className="flex gap-1">
-
-                <IdCardButton
-                  person={s}
-                  type="Student"
-                />
-
-                <MarksheetButton
-                  studentId={s.id}
-                  studentName={s.name}
-                  className={
-                    s.SchoolClass
-                      ? `${s.SchoolClass.course_name || ""}${
-                          s.SchoolClass.section || ""
-                        }`
-                      : ""
-                  }
-                  fetchUrl={`/exams/results/student/${s.id}`}
-                />
-
-                {canEdit && (
-                  <button
-                    onClick={() =>
-                      openPromotion(s)
-                    }
-                    className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"
-                    title="Promote Student"
-                  >
-                    <GraduationCap size={15} />
-                  </button>
-                )}
-
-                {canEdit && (
-                  <button
-                    onClick={() => openEdit(s)}
-                    className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
-                    title="Edit Student"
-                  >
-                    <Pencil size={15} />
-                  </button>
-                )}
-
-                {canDelete && (
-                  <button
-                    onClick={() =>
-                      handleDelete(s.id)
-                    }
-                    className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
-                    title="Delete Student"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
-
-              </div>
-            )}
+      <div className="flex justify-end mb-4 gap-2">
+        {canEdit && (
+          <BulkImportButton
+            endpoint="/students/bulk"
+            payloadKey="students"
+            expectedColumns={[
+              { key: "name", label: "name" },
+              { key: "email", label: "email" },
+              {
+                key: "roll_no",
+                label: "roll_no",
+              },
+              {
+                key: "admission_no",
+                label: "admission_no",
+              },
+            ]}
+            onDone={load}
           />
         )}
 
+        {canEdit && (
+          <button
+            onClick={openCreate}
+            className="btn-primary flex items-center gap-1.5"
+          >
+            <Plus size={16} />
+            Add Student
+          </button>
+        )}
       </div>
+
+      {/* -------------------------------- */}
+      {/* Filters */}
+      {/* -------------------------------- */}
+
+      <div className="border border-[#eef0f4] rounded-xl p-4 mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-semibold text-navy-900">
+              Student Filters
+            </h3>
+
+            <p className="text-xs text-navy-900/50 mt-0.5">
+              Filter students by course, department,
+              year, semester, session and section.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={resetFilters}
+            className="btn-outline text-sm flex items-center gap-1.5"
+          >
+            <RotateCcw size={14} />
+            Reset
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div>
+            <label className="form-label">
+              Course
+            </label>
+
+            <select
+              name="course"
+              value={filters.course}
+              onChange={handleFilterChange}
+              className="form-input"
+            >
+              <option value="">
+                All Courses
+              </option>
+
+              {courseOptions.map((course) => (
+                <option
+                  key={course}
+                  value={course}
+                >
+                  {course}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">
+              Department
+            </label>
+
+            <select
+              name="department"
+              value={filters.department}
+              onChange={handleFilterChange}
+              className="form-input"
+            >
+              <option value="">
+                All Departments
+              </option>
+
+              {departmentOptions.map(
+                (department) => (
+                  <option
+                    key={department}
+                    value={department}
+                  >
+                    {department}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">
+              Year
+            </label>
+
+            <select
+              name="year"
+              value={filters.year}
+              onChange={handleFilterChange}
+              className="form-input"
+            >
+              <option value="">
+                All Years
+              </option>
+
+              {yearOptions.map((year) => (
+                <option
+                  key={year}
+                  value={year}
+                >
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">
+              Semester
+            </label>
+
+            <select
+              name="semester"
+              value={filters.semester}
+              onChange={handleFilterChange}
+              className="form-input"
+            >
+              <option value="">
+                All Semesters
+              </option>
+
+              {semesterOptions.map(
+                (semester) => (
+                  <option
+                    key={semester}
+                    value={semester}
+                  >
+                    {semester}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">
+              Session
+            </label>
+
+            <select
+              name="session"
+              value={filters.session}
+              onChange={handleFilterChange}
+              className="form-input"
+            >
+              <option value="">
+                All Sessions
+              </option>
+
+              {sessionOptions.map((session) => (
+                <option
+                  key={session}
+                  value={session}
+                >
+                  {session}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">
+              Section
+            </label>
+
+            <select
+              name="section"
+              value={filters.section}
+              onChange={handleFilterChange}
+              className="form-input"
+            >
+              <option value="">
+                All Sections
+              </option>
+
+              {sectionOptions.map((section) => (
+                <option
+                  key={section}
+                  value={section}
+                >
+                  Section {section}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3 text-xs text-navy-900/50">
+          Showing{" "}
+          <span className="font-semibold text-navy-900">
+            {filteredStudents.length}
+          </span>{" "}
+          of{" "}
+          <span className="font-semibold text-navy-900">
+            {students.length}
+          </span>{" "}
+          students
+        </div>
+      </div>
+
+      {/* -------------------------------- */}
+      {/* Student table */}
+      {/* -------------------------------- */}
+
+      {loading ? (
+        <div className="text-center py-8 text-navy-900/40 text-sm">
+          Loading...
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filteredStudents}
+          searchPlaceholder="Search students..."
+          exportFileName="students"
+          actionsColumn={(s) => (
+            <div className="flex gap-1">
+              <IdCardButton
+                person={s}
+                type="Student"
+              />
+
+              <MarksheetButton
+                studentId={s.id}
+                studentName={s.name}
+                className={
+                  s.SchoolClass
+                    ? `${s.SchoolClass.course_name || ""}${
+                        s.SchoolClass.section || ""
+                      }`
+                    : ""
+                }
+                fetchUrl={`/exams/results/student/${s.id}`}
+              />
+
+              {canEdit && (
+                <button
+                  onClick={() => openPromotion(s)}
+                  className="p-1.5 rounded-lg hover:bg-green-50 text-green-600"
+                  title="Promote Student"
+                >
+                  <GraduationCap size={15} />
+                </button>
+              )}
+
+              {canEdit && (
+                <button
+                  onClick={() => openEdit(s)}
+                  className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
+                  title="Edit Student"
+                >
+                  <Pencil size={15} />
+                </button>
+              )}
+
+              {canDelete && (
+                <button
+                  onClick={() => handleDelete(s.id)}
+                  className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                  title="Delete Student"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+            </div>
+          )}
+        />
+      )}
 
       {/* -------------------------------- */}
       {/* Add / Edit Student Modal */}
@@ -1010,7 +1022,6 @@ export default function Students() {
           onSubmit={handleSubmit}
           className="space-y-4"
         >
-
           {error && (
             <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">
               {error}
@@ -1018,7 +1029,6 @@ export default function Students() {
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
             <div>
               <label className="form-label">
                 Full name
@@ -1216,11 +1226,9 @@ export default function Students() {
                 className="form-input"
               />
             </div>
-
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-
             <button
               type="button"
               onClick={() =>
@@ -1240,9 +1248,7 @@ export default function Students() {
                 ? "Saving..."
                 : "Save Student"}
             </button>
-
           </div>
-
         </form>
       </Modal>
 
@@ -1264,10 +1270,8 @@ export default function Students() {
           onSubmit={handlePromotion}
           className="space-y-4"
         >
-
           {promotionStudent && (
             <div className="rounded-xl bg-green-50 border border-green-100 p-4">
-
               <div className="font-semibold text-navy-900">
                 {promotionStudent.name}
               </div>
@@ -1301,7 +1305,6 @@ export default function Students() {
                     .join(" — ")}
                 </div>
               )}
-
             </div>
           )}
 
@@ -1311,46 +1314,53 @@ export default function Students() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* -------------------------------- */}
+          {/* New Class */}
+          {/* -------------------------------- */}
 
-            <div className="sm:col-span-2">
-              <label className="form-label">
-                New Class
-              </label>
+          <div>
+            <label className="form-label">
+              New Class
+            </label>
 
-              <select
-                name="class_id"
-                required
-                value={promotionForm.class_id}
-                onChange={handlePromotionChange}
-                className="form-input"
-              >
-                <option value="">
-                  Select New Class
+            <select
+              name="class_id"
+              required
+              value={promotionForm.class_id}
+              onChange={handlePromotionClassChange}
+              className="form-input"
+            >
+              <option value="">
+                Select New Class
+              </option>
+
+              {classes.map((c) => (
+                <option
+                  key={c.id}
+                  value={c.id}
+                >
+                  {[
+                    c.course_name,
+                    c.department_name,
+                    c.year,
+                    c.semester,
+                    c.session,
+                    c.section
+                      ? `Section ${c.section}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" — ")}
                 </option>
+              ))}
+            </select>
+          </div>
 
-                {classes.map((c) => (
-                  <option
-                    key={c.id}
-                    value={c.id}
-                  >
-                    {[
-                      c.course_name,
-                      c.department_name,
-                      c.year,
-                      c.semester,
-                      c.session,
-                      c.section
-                        ? `Section ${c.section}`
-                        : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" — ")}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* -------------------------------- */}
+          {/* Auto Filled Academic Information */}
+          {/* -------------------------------- */}
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="form-label">
                 New Session
@@ -1358,11 +1368,10 @@ export default function Students() {
 
               <input
                 name="session"
-                required
                 value={promotionForm.session}
-                onChange={handlePromotionChange}
-                placeholder="2027-28"
-                className="form-input"
+                readOnly
+                placeholder="Auto filled from New Class"
+                className="form-input bg-navy-900/5 cursor-not-allowed"
               />
             </div>
 
@@ -1373,11 +1382,10 @@ export default function Students() {
 
               <input
                 name="year"
-                required
                 value={promotionForm.year}
-                onChange={handlePromotionChange}
-                placeholder="2nd Year"
-                className="form-input"
+                readOnly
+                placeholder="Auto filled from New Class"
+                className="form-input bg-navy-900/5 cursor-not-allowed"
               />
             </div>
 
@@ -1388,11 +1396,10 @@ export default function Students() {
 
               <input
                 name="semester"
-                required
                 value={promotionForm.semester}
-                onChange={handlePromotionChange}
-                placeholder="3rd Semester"
-                className="form-input"
+                readOnly
+                placeholder="Auto filled from New Class"
+                className="form-input bg-navy-900/5 cursor-not-allowed"
               />
             </div>
 
@@ -1404,9 +1411,9 @@ export default function Students() {
               <input
                 name="section"
                 value={promotionForm.section}
-                onChange={handlePromotionChange}
-                placeholder="A"
-                className="form-input"
+                readOnly
+                placeholder="Auto filled from New Class"
+                className="form-input bg-navy-900/5 cursor-not-allowed"
               />
             </div>
 
@@ -1423,17 +1430,27 @@ export default function Students() {
                 className="form-input"
               />
             </div>
-
           </div>
 
+          {/* -------------------------------- */}
+          {/* Info */}
+          {/* -------------------------------- */}
+
           <div className="rounded-lg bg-yellow-50 border border-yellow-100 p-3 text-xs text-yellow-800">
+            New Class select karte hi us class ka
+            <b> Session, Year, Semester aur Section </b>
+            automatically fill ho jayega.
+            <br />
             Promotion karne par current academic
             record <b>completed</b> hoga aur new
             academic record <b>active</b> ho jayega.
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          {/* -------------------------------- */}
+          {/* Buttons */}
+          {/* -------------------------------- */}
 
+          <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               disabled={promotionSaving}
@@ -1456,12 +1473,9 @@ export default function Students() {
                 ? "Promoting..."
                 : "Promote Student"}
             </button>
-
           </div>
-
         </form>
       </Modal>
-
     </DashboardLayout>
   );
 }
