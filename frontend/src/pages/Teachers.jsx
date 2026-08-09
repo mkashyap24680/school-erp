@@ -1,166 +1,998 @@
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, Search, IdCard } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
 import Modal from "../components/Modal";
-import DataTable from "../components/DataTable";
-import IdCardButton from "../components/IdCardButton";
 import BulkImportButton from "../components/BulkImportButton";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 
-const emptyForm = { name: "", email: "", phone: "", subject: "", qualification: "", joining_date: "" };
+const emptyForm = {
+  name: "",
+  employee_id: "",
+  email: "",
+  phone: "",
+  subject: "",
+  department: "",
+  course: "",
+  designation: "",
+  qualification: "",
+  joining_date: "",
+  experience: "",
+  employment_type: "",
+  campus: "",
+  status: "active",
+  address: "",
+  emergency_contact_name: "",
+  emergency_contact_number: "",
+};
 
 export default function Teachers() {
   const { user } = useAuth();
+
   const canEdit = ["admin", "management"].includes(user?.role);
   const canDelete = user?.role === "admin";
 
   const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const load = () => {
+  // Filters
+  const [search, setSearch] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
+  const [courseFilter, setCourseFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+
+  const load = async () => {
     setLoading(true);
-    api.get("/teachers").then((res) => setTeachers(res.data)).finally(() => setLoading(false));
+
+    try {
+      const res = await api.get("/teachers");
+      setTeachers(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to load teachers:", err);
+      setTeachers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const openCreate = () => { setEditingId(null); setForm(emptyForm); setError(""); setModalOpen(true); };
-  const openEdit = (t) => {
-    setEditingId(t.id);
-    setForm({
-      name: t.name || "", email: t.email || "", phone: t.phone || "",
-      subject: t.subject || "", qualification: t.qualification || "", joining_date: t.joining_date || "",
+  // -----------------------------------------
+  // Filter options
+  // -----------------------------------------
+
+  const departments = useMemo(() => {
+    return [
+      ...new Set(
+        teachers
+          .map((t) => t.department)
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [teachers]);
+
+  const subjects = useMemo(() => {
+    return [
+      ...new Set(
+        teachers
+          .map((t) => t.subject)
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [teachers]);
+
+  const courses = useMemo(() => {
+    return [
+      ...new Set(
+        teachers
+          .map((t) => t.course)
+          .filter(Boolean)
+      ),
+    ].sort();
+  }, [teachers]);
+
+  // -----------------------------------------
+  // Apply filters
+  // -----------------------------------------
+
+  const filteredTeachers = useMemo(() => {
+    const searchText = search.trim().toLowerCase();
+
+    return teachers.filter((teacher) => {
+      const matchesSearch =
+        !searchText ||
+        teacher.name?.toLowerCase().includes(searchText) ||
+        teacher.employee_id?.toLowerCase().includes(searchText) ||
+        teacher.email?.toLowerCase().includes(searchText) ||
+        teacher.phone?.toLowerCase().includes(searchText);
+
+      const matchesDepartment =
+        !departmentFilter ||
+        teacher.department === departmentFilter;
+
+      const matchesSubject =
+        !subjectFilter ||
+        teacher.subject === subjectFilter;
+
+      const matchesCourse =
+        !courseFilter ||
+        teacher.course === courseFilter;
+
+      const matchesStatus =
+        !statusFilter ||
+        teacher.status === statusFilter;
+
+      return (
+        matchesSearch &&
+        matchesDepartment &&
+        matchesSubject &&
+        matchesCourse &&
+        matchesStatus
+      );
     });
+  }, [
+    teachers,
+    search,
+    departmentFilter,
+    subjectFilter,
+    courseFilter,
+    statusFilter,
+  ]);
+
+  // -----------------------------------------
+  // Create
+  // -----------------------------------------
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm({ ...emptyForm });
     setError("");
     setModalOpen(true);
   };
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  // -----------------------------------------
+  // Edit
+  // -----------------------------------------
+
+  const openEdit = (teacher) => {
+    setEditingId(teacher.id);
+
+    setForm({
+      name: teacher.name || "",
+      employee_id: teacher.employee_id || "",
+      email: teacher.email || "",
+      phone: teacher.phone || "",
+      subject: teacher.subject || "",
+      department: teacher.department || "",
+      course: teacher.course || "",
+      designation: teacher.designation || "",
+      qualification: teacher.qualification || "",
+      joining_date: teacher.joining_date || "",
+      experience: teacher.experience || "",
+      employment_type: teacher.employment_type || "",
+      campus: teacher.campus || "",
+      status: teacher.status || "active",
+      address: teacher.address || "",
+      emergency_contact_name:
+        teacher.emergency_contact_name || "",
+      emergency_contact_number:
+        teacher.emergency_contact_number || "",
+    });
+
+    setError("");
+    setModalOpen(true);
+  };
+
+  // -----------------------------------------
+  // Input change
+  // -----------------------------------------
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // -----------------------------------------
+  // Save
+  // -----------------------------------------
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     setSaving(true);
     setError("");
+
     try {
+      const payload = {
+        ...form,
+
+        name: form.name.trim(),
+        employee_id: form.employee_id.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        subject: form.subject.trim(),
+        department: form.department.trim(),
+        course: form.course.trim(),
+        designation: form.designation.trim(),
+        qualification: form.qualification.trim(),
+        experience: form.experience.trim(),
+        employment_type: form.employment_type.trim(),
+        campus: form.campus.trim(),
+        address: form.address.trim(),
+        emergency_contact_name:
+          form.emergency_contact_name.trim(),
+        emergency_contact_number:
+          form.emergency_contact_number.trim(),
+      };
+
       if (editingId) {
-        await api.put(`/teachers/${editingId}`, form);
+        await api.put(`/teachers/${editingId}`, payload);
       } else {
-        await api.post("/teachers", form);
+        await api.post("/teachers", payload);
       }
+
       setModalOpen(false);
-      load();
+      setForm({ ...emptyForm });
+      setEditingId(null);
+
+      await load();
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to save teacher.");
+      console.error("Save teacher error:", err);
+
+      setError(
+        err.response?.data?.message ||
+          "Failed to save teacher."
+      );
     } finally {
       setSaving(false);
     }
   };
 
+  // -----------------------------------------
+  // Delete
+  // -----------------------------------------
+
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this teacher record? This cannot be undone.")) return;
-    await api.delete(`/teachers/${id}`);
-    load();
+    if (
+      !window.confirm(
+        "Delete this teacher record? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(`/teachers/${id}`);
+      await load();
+    } catch (err) {
+      alert(
+        err.response?.data?.message ||
+          "Failed to delete teacher."
+      );
+    }
   };
 
-  const columns = [
-    { key: "name", label: "Name", render: (t) => <span className="font-medium">{t.name}</span> },
-    { key: "subject", label: "Subject" },
-    { key: "phone", label: "Phone" },
-    { key: "qualification", label: "Qualification" },
-    {
-      key: "classes", label: "Classes Handled",
-      exportValue: (t) => t.classesHandled?.length ? t.classesHandled.map((c) => `${c.name}${c.section}`).join(", ") : "—",
-      render: (t) => t.classesHandled?.length ? t.classesHandled.map((c) => `${c.name}${c.section}`).join(", ") : "—",
-    },
-  ];
+  // -----------------------------------------
+  // Clear filters
+  // -----------------------------------------
+
+  const clearFilters = () => {
+    setSearch("");
+    setDepartmentFilter("");
+    setSubjectFilter("");
+    setCourseFilter("");
+    setStatusFilter("");
+  };
 
   return (
-    <DashboardLayout title="Teachers">
-      <div className="card p-4 sm:p-5">
-        <div className="flex justify-end mb-4 gap-2">
-          {canEdit && (
-            <BulkImportButton
-              endpoint="/teachers/bulk"
-              payloadKey="teachers"
-              expectedColumns={[{ key: "name", label: "name" }, { key: "email", label: "email" }, { key: "phone", label: "phone" }, { key: "subject", label: "subject" }]}
-              onDone={load}
-            />
-          )}
-          {canEdit && (
-            <button onClick={openCreate} className="btn-primary">
-              <Plus size={16} /> Add Teacher
+    <DashboardLayout>
+      <div className="space-y-6">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-navy-900">
+              Teachers
+            </h1>
+
+            <p className="text-sm text-navy-900/50 mt-1">
+              Manage teachers, departments, subjects and employment details.
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            {canEdit && (
+              <BulkImportButton
+                endpoint="/teachers/bulk"
+                payloadKey="teachers"
+                expectedColumns={[
+                  { key: "name", label: "name" },
+                  { key: "employee_id", label: "employee_id" },
+                  { key: "email", label: "email" },
+                  { key: "phone", label: "phone" },
+                  { key: "subject", label: "subject" },
+                  { key: "department", label: "department" },
+                  { key: "course", label: "course" },
+                  { key: "designation", label: "designation" },
+                  { key: "qualification", label: "qualification" },
+                  { key: "joining_date", label: "joining_date" },
+                  { key: "experience", label: "experience" },
+                  { key: "employment_type", label: "employment_type" },
+                  { key: "campus", label: "campus" },
+                  { key: "status", label: "status" },
+                ]}
+                onDone={load}
+              />
+            )}
+
+            {canEdit && (
+              <button
+                onClick={openCreate}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Plus size={17} />
+                Add Teacher
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Filters */}
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Search size={17} className="text-navy-900/50" />
+
+            <h2 className="font-semibold text-navy-900">
+              Quick Filters
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+
+            {/* Search */}
+            <div className="lg:col-span-1">
+              <input
+                type="text"
+                placeholder="Search Teacher..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="form-input"
+              />
+            </div>
+
+            {/* Department */}
+            <select
+              value={departmentFilter}
+              onChange={(e) =>
+                setDepartmentFilter(e.target.value)
+              }
+              className="form-input"
+            >
+              <option value="">All Departments</option>
+
+              {departments.map((department) => (
+                <option
+                  key={department}
+                  value={department}
+                >
+                  {department}
+                </option>
+              ))}
+            </select>
+
+            {/* Subject */}
+            <select
+              value={subjectFilter}
+              onChange={(e) =>
+                setSubjectFilter(e.target.value)
+              }
+              className="form-input"
+            >
+              <option value="">All Subjects</option>
+
+              {subjects.map((subject) => (
+                <option
+                  key={subject}
+                  value={subject}
+                >
+                  {subject}
+                </option>
+              ))}
+            </select>
+
+            {/* Course */}
+            <select
+              value={courseFilter}
+              onChange={(e) =>
+                setCourseFilter(e.target.value)
+              }
+              className="form-input"
+            >
+              <option value="">All Courses</option>
+
+              {courses.map((course) => (
+                <option
+                  key={course}
+                  value={course}
+                >
+                  {course}
+                </option>
+              ))}
+            </select>
+
+            {/* Status */}
+            <select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(e.target.value)
+              }
+              className="form-input"
+            >
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
+
+          {(search ||
+            departmentFilter ||
+            subjectFilter ||
+            courseFilter ||
+            statusFilter) && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-red-500 mt-3 hover:underline"
+            >
+              Clear Filters
             </button>
           )}
         </div>
 
+        {/* Result count */}
+        <div className="text-sm text-navy-900/50">
+          Showing{" "}
+          <span className="font-semibold text-navy-900">
+            {filteredTeachers.length}
+          </span>{" "}
+          of{" "}
+          <span className="font-semibold text-navy-900">
+            {teachers.length}
+          </span>{" "}
+          teachers
+        </div>
+
+        {/* Table */}
         {loading ? (
-          <div className="text-center py-8 text-navy-900/40 text-sm">Loading...</div>
+          <div className="card text-center py-10 text-navy-900/40">
+            Loading teachers...
+          </div>
+        ) : filteredTeachers.length === 0 ? (
+          <div className="card text-center py-10 text-navy-900/40">
+            No teachers found.
+          </div>
         ) : (
-          <DataTable
-            columns={columns}
-            rows={teachers}
-            searchPlaceholder="Search teachers..."
-            exportFileName="teachers"
-            actionsColumn={(t) => (
-              <div className="flex gap-1">
-                <IdCardButton person={t} type="Teacher" />
-                {canEdit && (
-                  <button onClick={() => openEdit(t)} className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60">
-                    <Pencil size={15} />
-                  </button>
-                )}
-                {canDelete && (
-                  <button onClick={() => handleDelete(t.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">
-                    <Trash2 size={15} />
-                  </button>
-                )}
+          <div className="card overflow-x-auto">
+            <table className="w-full text-sm">
+
+              <thead>
+                <tr className="border-b border-navy-900/10 text-left">
+                  <th className="px-4 py-4 font-semibold">
+                    Profile
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Employee ID
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Department
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Designation
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Experience
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Employment
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Campus
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Contact
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Status
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Joining Date
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {filteredTeachers.map((teacher) => (
+                  <tr
+                    key={teacher.id}
+                    className="border-b border-navy-900/5 hover:bg-[#f8f9fb]"
+                  >
+
+                    {/* Profile */}
+                    <td className="px-4 py-4">
+                      <div>
+                        <div className="font-semibold text-navy-900">
+                          {teacher.name || "—"}
+                        </div>
+
+                        <div className="text-xs text-navy-900/50 mt-1">
+                          {teacher.subject || "No subject"}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Employee ID */}
+                    <td className="px-4 py-4">
+                      {teacher.employee_id || "—"}
+                    </td>
+
+                    {/* Department */}
+                    <td className="px-4 py-4">
+                      {teacher.department || "—"}
+                    </td>
+
+                    {/* Designation */}
+                    <td className="px-4 py-4">
+                      {teacher.designation || "—"}
+                    </td>
+
+                    {/* Experience */}
+                    <td className="px-4 py-4">
+                      {teacher.experience
+                        ? `${teacher.experience}`
+                        : "—"}
+                    </td>
+
+                    {/* Employment */}
+                    <td className="px-4 py-4">
+                      {teacher.employment_type || "—"}
+                    </td>
+
+                    {/* Campus */}
+                    <td className="px-4 py-4">
+                      {teacher.campus || "—"}
+                    </td>
+
+                    {/* Contact */}
+                    <td className="px-4 py-4">
+                      <div>
+                        <div>
+                          {teacher.phone || "—"}
+                        </div>
+
+                        <div className="text-xs text-navy-900/50 mt-1">
+                          {teacher.email || "—"}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-4">
+                      {teacher.status === "inactive" ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          Inactive
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                          Active
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Joining Date */}
+                    <td className="px-4 py-4">
+                      {teacher.joining_date || "—"}
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-1">
+
+                        <button
+                          className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
+                          title="Generate ID Card"
+                        >
+                          <IdCard size={15} />
+                        </button>
+
+                        {canEdit && (
+                          <button
+                            onClick={() =>
+                              openEdit(teacher)
+                            }
+                            className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
+                            title="Edit"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        )}
+
+                        {canDelete && (
+                          <button
+                            onClick={() =>
+                              handleDelete(teacher.id)
+                            }
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                            title="Delete"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Add/Edit Teacher Modal */}
+        <Modal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title={
+            editingId
+              ? "Edit Teacher"
+              : "Add Teacher"
+          }
+          wide
+        >
+          <form
+            onSubmit={handleSubmit}
+            className="space-y-5"
+          >
+
+            {error && (
+              <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">
+                {error}
               </div>
             )}
-          />
-        )}
-      </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? "Edit Teacher" : "Add Teacher"} wide>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">{error}</div>}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Personal Information */}
             <div>
-              <label className="form-label">Full name</label>
-              <input name="name" required value={form.name} onChange={handleChange} className="form-input" />
+              <h3 className="font-semibold text-navy-900 mb-3">
+                Personal Information
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <div>
+                  <label className="form-label">
+                    Full name
+                  </label>
+
+                  <input
+                    name="name"
+                    required
+                    value={form.name}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. Rahul Sharma"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Employee ID
+                  </label>
+
+                  <input
+                    name="employee_id"
+                    value={form.employee_id}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. EMP-1025"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Email
+                  </label>
+
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="teacher@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Phone
+                  </label>
+
+                  <input
+                    name="phone"
+                    value={form.phone}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="9876543210"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Emergency Contact Name
+                  </label>
+
+                  <input
+                    name="emergency_contact_name"
+                    value={form.emergency_contact_name}
+                    onChange={handleChange}
+                    className="form-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Emergency Contact Number
+                  </label>
+
+                  <input
+                    name="emergency_contact_number"
+                    value={form.emergency_contact_number}
+                    onChange={handleChange}
+                    className="form-input"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="form-label">
+                    Address
+                  </label>
+
+                  <textarea
+                    name="address"
+                    value={form.address}
+                    onChange={handleChange}
+                    className="form-input min-h-[80px]"
+                    placeholder="Full residential address"
+                  />
+                </div>
+              </div>
             </div>
+
+            {/* Academic / Professional Information */}
             <div>
-              <label className="form-label">Email</label>
-              <input type="email" name="email" value={form.email} onChange={handleChange} className="form-input" />
+              <h3 className="font-semibold text-navy-900 mb-3">
+                Professional Information
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <div>
+                  <label className="form-label">
+                    Department
+                  </label>
+
+                  <input
+                    name="department"
+                    value={form.department}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. Computer Science"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Subject
+                  </label>
+
+                  <input
+                    name="subject"
+                    value={form.subject}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. Data Structures"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Course
+                  </label>
+
+                  <input
+                    name="course"
+                    value={form.course}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. B.Tech"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Designation
+                  </label>
+
+                  <input
+                    name="designation"
+                    value={form.designation}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. Assistant Professor"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Qualification
+                  </label>
+
+                  <input
+                    name="qualification"
+                    value={form.qualification}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. M.Tech, PhD"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Experience
+                  </label>
+
+                  <input
+                    name="experience"
+                    value={form.experience}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. 6 Years"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Joining date
+                  </label>
+
+                  <input
+                    type="date"
+                    name="joining_date"
+                    value={form.joining_date}
+                    onChange={handleChange}
+                    className="form-input"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Employment Type
+                  </label>
+
+                  <select
+                    name="employment_type"
+                    value={form.employment_type}
+                    onChange={handleChange}
+                    className="form-input"
+                  >
+                    <option value="">
+                      Select employment type
+                    </option>
+                    <option value="Permanent">
+                      Permanent
+                    </option>
+                    <option value="Contract">
+                      Contract
+                    </option>
+                    <option value="Part Time">
+                      Part Time
+                    </option>
+                    <option value="Visiting">
+                      Visiting
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Campus / Branch
+                  </label>
+
+                  <input
+                    name="campus"
+                    value={form.campus}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder="e.g. Main Campus"
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">
+                    Status
+                  </label>
+
+                  <select
+                    name="status"
+                    value={form.status}
+                    onChange={handleChange}
+                    className="form-input"
+                  >
+                    <option value="active">
+                      Active
+                    </option>
+
+                    <option value="inactive">
+                      Inactive
+                    </option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="form-label">Phone</label>
-              <input name="phone" value={form.phone} onChange={handleChange} className="form-input" />
+
+            {/* Buttons */}
+            <div className="flex justify-end gap-3 pt-2">
+
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="btn-outline"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving}
+                className="btn-primary"
+              >
+                {saving
+                  ? "Saving..."
+                  : editingId
+                  ? "Update Teacher"
+                  : "Save Teacher"}
+              </button>
+
             </div>
-            <div>
-              <label className="form-label">Subject</label>
-              <input name="subject" value={form.subject} onChange={handleChange} className="form-input" />
-            </div>
-            <div>
-              <label className="form-label">Qualification</label>
-              <input name="qualification" value={form.qualification} onChange={handleChange} className="form-input" />
-            </div>
-            <div>
-              <label className="form-label">Joining date</label>
-              <input type="date" name="joining_date" value={form.joining_date} onChange={handleChange} className="form-input" />
-            </div>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="btn-outline">Cancel</button>
-            <button type="submit" disabled={saving} className="btn-primary">{saving ? "Saving..." : "Save Teacher"}</button>
-          </div>
-        </form>
-      </Modal>
+          </form>
+        </Modal>
+      </div>
     </DashboardLayout>
   );
 }
