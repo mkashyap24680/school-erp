@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { GraduationCap, Mail, Lock, Loader2, ShieldCheck, Info } from "lucide-react";
+import {
+  GraduationCap,
+  Mail,
+  Lock,
+  Loader2,
+  ShieldCheck,
+  Info,
+  Eye,
+  EyeOff
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSchoolProfile } from "../context/SchoolProfileContext";
 import api from "../api/axios";
@@ -14,7 +23,7 @@ export default function Login() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
+  const [showPassword, setShowPassword] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
   const [preAuthToken, setPreAuthToken] = useState("");
   const [otp, setOtp] = useState("");
@@ -125,13 +134,38 @@ export default function Login() {
                     <input type="email" name="email" required value={form.email} onChange={handleChange} placeholder="you@school.com" className="form-input pl-11" />
                   </div>
                 </div>
-                <div>
-                  <label className="form-label">Password</label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-900/40" />
-                    <input type="password" name="password" required value={form.password} onChange={handleChange} placeholder="••••••••" className="form-input pl-11" />
-                  </div>
-                </div>
+                ```jsx
+<div>
+  <label className="form-label">Password</label>
+
+  <div className="relative">
+    <Lock
+      size={16}
+      className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-900/40"
+    />
+
+    <input
+      type={showPassword ? "text" : "password"}
+      name="password"
+      required
+      value={form.password}
+      onChange={handleChange}
+      placeholder="••••••••"
+      className="form-input pl-11 pr-11"
+    />
+
+    <button
+      type="button"
+      onClick={() => setShowPassword((prev) => !prev)}
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-navy-900/40 hover:text-navy-900 transition-colors"
+      aria-label={showPassword ? "Hide password" : "Show password"}
+    >
+      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+    </button>
+  </div>
+</div>
+```
+
                 <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-2.5">
                   {loading && <Loader2 size={16} className="animate-spin" />}
                   {loading ? "Signing in..." : "Sign In"}
