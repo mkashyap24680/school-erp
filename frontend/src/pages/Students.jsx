@@ -492,21 +492,20 @@ export default function Students() {
   // ---------------------------------------
 
   const openPromotion = (student) => {
-    setPromotionStudent(student);
+  setPromotionStudent(student);
 
-    setPromotionForm({
-      class_id: "",
-      session: "",
-      year: "",
-      semester: "",
-      section: "",
-      start_date: "",
-    });
+  setPromotionForm({
+    class_id: "",
+    session: "",
+    year: "",
+    semester: "",
+    section: "",
+    start_date: getTodayDate(),
+  });
 
-    setPromotionError("");
-    setPromotionOpen(true);
-  };
-
+  setPromotionError("");
+  setPromotionOpen(true);
+};
   // ---------------------------------------
   // Promotion class change
   // ---------------------------------------
@@ -517,7 +516,14 @@ export default function Students() {
   // Section
   // automatically fill ho jayenge.
   // ---------------------------------------
+const getTodayDate = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
 
+  return `${year}-${month}-${day}`;
+};
   const handlePromotionClassChange = (e) => {
     const classId = e.target.value;
 
