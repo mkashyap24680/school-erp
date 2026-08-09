@@ -570,3 +570,58 @@ html.dark .badge-gray {
   background: #1e2947;
   color: #9aa4c4;
 }
+
+/* ================================
+   DARK MODE GLOBAL FIX
+   ================================ */
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Text visibility */
+html.dark .text-navy-900 {
+  color: #e7ebf5 !important;
+}
+
+html.dark .text-navy-900\/40 {
+  color: rgba(231, 235, 245, 0.4) !important;
+}
+
+html.dark .text-navy-900\/50 {
+  color: rgba(231, 235, 245, 0.5) !important;
+}
+
+html.dark .text-navy-900\/60 {
+  color: rgba(231, 235, 245, 0.6) !important;
+}
+
+html.dark .text-navy-900\/70 {
+  color: rgba(231, 235, 245, 0.7) !important;
+}
+
+
+
+/* Input / Search / Login fields */
+.form-input {
+  box-sizing: border-box;
+  line-height: 1.5;
+}
+
+.form-input.pl-9 {
+  padding-left: 2.5rem !important;
+}
+
+.form-input::placeholder {
+  opacity: 1;
+}
+
+html.dark .form-input {
+  background-color: #0f1730;
+  color: #e7ebf5;
+  border-color: #263257;
+}
+
+html.dark .form-input::placeholder {
+  color: #7c8499;
+}
