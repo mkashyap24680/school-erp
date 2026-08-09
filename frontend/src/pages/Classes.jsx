@@ -11,6 +11,8 @@ const emptyForm = {
   department_name: "",
   department_code: "",
   section: "",
+  year: "",
+  session: "",
   teacher_id: "",
 };
 
@@ -51,14 +53,15 @@ export default function Classes() {
   setEditingId(c.id);
 
   setForm({
-    course_name: c.course_name || "",
-    course_code: c.course_code || "",
-    department_name: c.department_name || "",
-    department_code: c.department_code || "",
-    section: c.section || "",
-    teacher_id: c.teacher_id || "",
-  });
-
+  course_name: c.course_name || "",
+  course_code: c.course_code || "",
+  department_name: c.department_name || "",
+  department_code: c.department_code || "",
+  section: c.section || "",
+  year: c.year || "",
+  session: c.session || "",
+  teacher_id: c.teacher_id || "",
+});
   setError("");
   setModalOpen(true);
 };
@@ -73,13 +76,15 @@ export default function Classes() {
 
   try {
     const payload = {
-      course_name: form.course_name,
-      course_code: form.course_code || null,
-      department_name: form.department_name,
-      department_code: form.department_code || null,
-      section: form.section || null,
-      teacher_id: form.teacher_id || null,
-    };
+  course_name: form.course_name,
+  course_code: form.course_code || null,
+  department_name: form.department_name,
+  department_code: form.department_code || null,
+  section: form.section || null,
+  year: form.year || null,
+  session: form.session || null,
+  teacher_id: form.teacher_id || null,
+};
 
     if (editingId) {
       await api.put(`/classes/${editingId}`, payload);
@@ -143,6 +148,17 @@ export default function Classes() {
                           Section: {c.section}
                         </p>
                       )}
+                      {c.year && (
+                          <p className="text-sm text-navy-900/60 mt-1">
+                            Year: {c.year}
+                          </p>
+                        )}
+                        
+                        {c.session && (
+                          <p className="text-sm text-navy-900/60 mt-1">
+                            Session: {c.session}
+                          </p>
+                        )}
                 </div>
                 {(canEdit || canDelete) && (
                   <div className="flex gap-1">
@@ -227,6 +243,41 @@ export default function Classes() {
     onChange={handleChange}
     className="form-input"
   />
+</div>
+          <div>
+  <label className="form-label">Year</label>
+  <select
+    name="year"
+    value={form.year}
+    onChange={handleChange}
+    className="form-input"
+  >
+    <option value="">Select Year</option>
+    <option value="1st Year">1st Year</option>
+    <option value="2nd Year">2nd Year</option>
+    <option value="3rd Year">3rd Year</option>
+    <option value="4th Year">4th Year</option>
+    <option value="5th Year">5th Year</option>
+    <option value="6th Year">6th Year</option>
+  </select>
+</div>
+
+<div>
+  <label className="form-label">Session</label>
+  <select
+    name="session"
+    value={form.session}
+    onChange={handleChange}
+    className="form-input"
+  >
+    <option value="">Select Session</option>
+    <option value="2025-26">2025-26</option>
+    <option value="2026-27">2026-27</option>
+    <option value="2027-28">2027-28</option>
+    <option value="2028-29">2028-29</option>
+    <option value="2029-30">2029-30</option>
+    <option value="2030-31">2030-31</option>
+  </select>
 </div>
 
 <div>
