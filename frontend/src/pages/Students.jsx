@@ -957,15 +957,15 @@ export default function Students() {
                 onChange={handleChange}
                 className="form-input"
               >
-                <option value="Male">
+                <option value="male">
                   Male
                 </option>
 
-                <option value="Female">
+                <option value="female">
                   Female
                 </option>
 
-                <option value="Other">
+                <option value="other">
                   Other
                 </option>
               </select>
