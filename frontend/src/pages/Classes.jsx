@@ -10,9 +10,10 @@ const emptyForm = {
   course_code: "",
   department_name: "",
   department_code: "",
-  section: "",
   year: "",
+  semester: "",
   session: "",
+  section: "",
   teacher_id: "",
 };
 
@@ -57,9 +58,10 @@ export default function Classes() {
   course_code: c.course_code || "",
   department_name: c.department_name || "",
   department_code: c.department_code || "",
-  section: c.section || "",
   year: c.year || "",
+  semester: c.semester || "",
   session: c.session || "",
+  section: c.section || "",
   teacher_id: c.teacher_id || "",
 });
   setError("");
@@ -80,9 +82,10 @@ export default function Classes() {
   course_code: form.course_code || null,
   department_name: form.department_name,
   department_code: form.department_code || null,
-  section: form.section || null,
   year: form.year || null,
+  semester: form.semester || null,
   session: form.session || null,
+  section: form.section || null,
   teacher_id: form.teacher_id || null,
 };
 
@@ -153,7 +156,11 @@ export default function Classes() {
                             Year: {c.year}
                           </p>
                         )}
-                        
+                        {c.semester && (
+  <p className="text-sm text-navy-900/60 mt-1">
+    Semester: {c.semester}
+  </p>
+)}
                         {c.session && (
                           <p className="text-sm text-navy-900/60 mt-1">
                             Session: {c.session}
@@ -246,38 +253,36 @@ export default function Classes() {
 </div>
           <div>
   <label className="form-label">Year</label>
-  <select
+  <input
     name="year"
+    required
+    placeholder="e.g. 1st Year"
     value={form.year}
     onChange={handleChange}
     className="form-input"
-  >
-    <option value="">Select Year</option>
-    <option value="1st Year">1st Year</option>
-    <option value="2nd Year">2nd Year</option>
-    <option value="3rd Year">3rd Year</option>
-    <option value="4th Year">4th Year</option>
-    <option value="5th Year">5th Year</option>
-    <option value="6th Year">6th Year</option>
-  </select>
+  />
+</div>
+          <div>
+  <label className="form-label">Semester</label>
+  <input
+    name="semester"
+    placeholder="e.g. 1st Semester"
+    value={form.semester}
+    onChange={handleChange}
+    className="form-input"
+  />
 </div>
 
 <div>
   <label className="form-label">Session</label>
-  <select
+  <input
     name="session"
+    required
+    placeholder="e.g. 2026-27"
     value={form.session}
     onChange={handleChange}
     className="form-input"
-  >
-    <option value="">Select Session</option>
-    <option value="2025-26">2025-26</option>
-    <option value="2026-27">2026-27</option>
-    <option value="2027-28">2027-28</option>
-    <option value="2028-29">2028-29</option>
-    <option value="2029-30">2029-30</option>
-    <option value="2030-31">2030-31</option>
-  </select>
+  />
 </div>
 
 <div>
