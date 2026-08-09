@@ -30,6 +30,7 @@ const eventRoutes = require("./routes/eventRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const schoolProfileRoutes = require("./routes/schoolProfileRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
+const academicHistoryRoutes = require("./routes/academicHistoryRoutes");
 
 const app = express();
 
@@ -67,6 +68,7 @@ app.use("/api/events", eventRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/school-profile", schoolProfileRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/academic-history", academicHistoryRoutes);
 
 // 404 handler
 app.use((req, res) => {
