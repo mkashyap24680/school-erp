@@ -14,6 +14,11 @@
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+html, body, #root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* =========================================================
    BASE
    ========================================================= */
