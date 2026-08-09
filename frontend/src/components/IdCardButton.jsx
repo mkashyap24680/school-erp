@@ -119,7 +119,7 @@ export default function IdCardButton({
               </div>
             </div>
 
-            {/* MAIN STUDENT INFO */}
+            {/* MAIN INFO */}
             <div
               style={{
                 display: "flex",
@@ -188,10 +188,105 @@ export default function IdCardButton({
                     Admission No: <b>{person.admission_no}</b>
                   </div>
                 )}
+
+                {person.employee_id && (
+                  <div>
+                    Employee ID: <b>{person.employee_id}</b>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* COURSE INFORMATION */}
+            {/* PROFESSIONAL INFORMATION (Teacher) */}
+            {(person.designation || person.department || person.employee_id) && (
+              <div
+                style={{
+                  borderTop: "1px solid #eef0f4",
+                  padding: "12px 18px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    color: "#2f9e44",
+                    textTransform: "uppercase",
+                    marginBottom: 6,
+                  }}
+                >
+                  Professional Information
+                </div>
+
+                {person.designation && (
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {person.designation}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    marginTop: 3,
+                  }}
+                >
+                  {person.department || "-"}
+                  {person.subject ? ` · ${person.subject}` : ""}
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    marginTop: 7,
+                    fontSize: 11,
+                  }}
+                >
+                  {person.course && (
+                    <span>
+                      Course: <b>{person.course}</b>
+                    </span>
+                  )}
+
+                  {person.qualification && (
+                    <span>
+                      Qualification: <b>{person.qualification}</b>
+                    </span>
+                  )}
+
+                  {person.experience && (
+                    <span>
+                      Experience: <b>{person.experience}</b>
+                    </span>
+                  )}
+
+                  {person.employment_type && (
+                    <span>
+                      Type: <b>{person.employment_type}</b>
+                    </span>
+                  )}
+
+                  {person.campus && (
+                    <span>
+                      Campus: <b>{person.campus}</b>
+                    </span>
+                  )}
+
+                  {person.joining_date && (
+                    <span>
+                      Joined: <b>{person.joining_date}</b>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* COURSE INFORMATION (Student) */}
             {studentClass && (
               <div
                 style={{
@@ -270,7 +365,7 @@ export default function IdCardButton({
               </div>
             )}
 
-            {/* STUDENT INFORMATION */}
+            {/* PERSONAL / CONTACT INFORMATION */}
             <div
               style={{
                 borderTop: "1px solid #eef0f4",
@@ -286,7 +381,7 @@ export default function IdCardButton({
                   marginBottom: 8,
                 }}
               >
-                Student Information
+                {type} Information
               </div>
 
               <div
@@ -314,7 +409,7 @@ export default function IdCardButton({
 
                 {person.phone && (
                   <div>
-                    Student Phone: <b>{person.phone}</b>
+                    Phone: <b>{person.phone}</b>
                   </div>
                 )}
 
@@ -333,6 +428,18 @@ export default function IdCardButton({
                 {person.parent_phone && (
                   <div>
                     Parent Phone: <b>{person.parent_phone}</b>
+                  </div>
+                )}
+
+                {person.emergency_contact_name && (
+                  <div>
+                    Emergency Contact: <b>{person.emergency_contact_name}</b>
+                  </div>
+                )}
+
+                {person.emergency_contact_number && (
+                  <div>
+                    Emergency Phone: <b>{person.emergency_contact_number}</b>
                   </div>
                 )}
               </div>
