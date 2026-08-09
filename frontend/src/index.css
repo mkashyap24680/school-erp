@@ -662,3 +662,26 @@ html.dark .hover\:bg-\[\#f8f9fb\]:hover {
   background-color: #17203e !important;
 }
 
+/* =========================================================
+   HOVERABLE CARDS (e.g. Class/Course cards)
+   Same green glow style as form-input focus
+   ========================================================= */
+
+.card-hover {
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.card-hover:hover {
+  border-color: var(--color-brand-500);
+  box-shadow: 0 0 0 3px var(--color-brand-100);
+  transform: translateY(-1px);
+}
+
+html.dark .card-hover:hover {
+  border-color: var(--color-brand-400);
+  box-shadow: 0 0 0 3px rgba(63, 179, 80, 0.18);
+}
