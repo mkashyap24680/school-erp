@@ -131,7 +131,7 @@ export default function Login() {
                   <label className="form-label">Email address</label>
                   <div className="relative">
                     <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-navy-900/40" />
-                    <input type="email" name="email" required value={form.email} onChange={handleChange} placeholder="you@school.com" className="form-input pl-5" />
+                    <input type="email" name="email" required value={form.email} onChange={handleChange} placeholder="you@school.com" className="form-input pl-9" />
                   </div>
                 </div>
                 
