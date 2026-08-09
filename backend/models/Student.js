@@ -34,13 +34,14 @@ const Student = sequelize.define("Student", {
   email: {
     type: DataTypes.STRING,
   },
-  roll_no: {
-    type: DataTypes.STRING,
-  },
-  admission_no: {
-    type: DataTypes.STRING,
-    unique: true,
-  },
+  phone: {
+  type: DataTypes.STRING,
+},
+
+photo: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
   dob: {
     type: DataTypes.DATEONLY,
   },
