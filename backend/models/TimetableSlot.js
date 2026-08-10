@@ -17,7 +17,7 @@ const TimetableSlot = sequelize.define(
 
     teacher_id: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+      allowNull: false,
     },
 
     subject: {
@@ -25,19 +25,21 @@ const TimetableSlot = sequelize.define(
       allowNull: false,
     },
 
-    day_of_week: {
-      type: DataTypes.INTEGER,
+    day: {
+      type: DataTypes.STRING,
       allowNull: false,
       validate: {
-        min: 1,
-        max: 6,
+        isIn: [
+          [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+          ],
+        ],
       },
-    },
-
-    period: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 1,
     },
 
     start_time: {
@@ -57,13 +59,8 @@ const TimetableSlot = sequelize.define(
   },
   {
     tableName: "timetable_slots",
-
-    indexes: [
-      {
-        unique: true,
-        fields: ["class_id", "day_of_week", "period"],
-      },
-    ],
+    timestamps: true,
+    underscored: true,
   }
 );
 
