@@ -14,91 +14,165 @@ const DAY_MAP = {
   Thursday: 4,
   Friday: 5,
   Saturday: 6,
-  Sunday: 7,
 };
 
-const DAY_NAMES = {
+const DAY_NAME = {
   1: "Monday",
   2: "Tuesday",
   3: "Wednesday",
   4: "Thursday",
   5: "Friday",
   6: "Saturday",
-  7: "Sunday",
 };
 
 // --------------------------------------------------
 // HELPERS
 // --------------------------------------------------
 
-function normalizeDay(value) {
-  if (typeof value === "number") {
-    return value >= 1 && value <= 7 ? value : null;
-  }
+const timeToMinutes = (time) => {
+  if (!time) return 0;
 
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-
-    if (DAY_MAP[trimmed]) {
-      return DAY_MAP[trimmed];
-    }
-
-    const number = Number(trimmed);
-
-    if (number >= 1 && number <= 7) {
-      return number;
-    }
-  }
-
-  return null;
-}
-
-function timeToMinutes(time) {
-  if (!time) return null;
-
-  const value = String(time).slice(0, 5);
-  const [hours, minutes] = value.split(":").map(Number);
-
-  if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes)
-  ) {
-    return null;
-  }
+  const [hours, minutes] = String(time)
+    .slice(0, 5)
+    .split(":")
+    .map(Number);
 
   return hours * 60 + minutes;
-}
+};
 
-function timesOverlap(
+const isOverlapping = (
   startA,
   endA,
   startB,
   endB
-) {
-  const aStart = timeToMinutes(startA);
-  const aEnd = timeToMinutes(endA);
-  const bStart = timeToMinutes(startB);
-  const bEnd = timeToMinutes(endB);
+) => {
+  return (
+    timeToMinutes(startA) < timeToMinutes(endB) &&
+    timeToMinutes(endA) > timeToMinutes(startB)
+  );
+};
 
-  if (
-    aStart === null ||
-    aEnd === null ||
-    bStart === null ||
-    bEnd === null
-  ) {
-    return false;
-  }
+const getDayNumber = (day) => {
+  if (typeof day === "number") return day;
 
-  return aStart < bEnd && aEnd > bStart;
-}
+  return DAY_MAP[day] || null;
+};
 
-function formatTime(time) {
-  if (!time) return "";
-
-  return String(time).slice(0, 5);
-}
+const getDayName = (day) => {
+  return DAY_NAME[day] || day;
+};
 
 // --------------------------------------------------
+// CHECK CONFLICT
+// --------------------------------------------------
+
+const checkConflict = async ({
+  class_id,
+  teacher_id,
+  day_of_week,
+  start_time,
+  end_time,
+  excludeId = null,
+}) => {
+  const existingSlots = await TimetableSlot.findAll({
+    where: {
+      day_of_week,
+    },
+  });
+
+  for (const slot of existingSlots) {
+    // Current slot ko ignore karo during edit
+    if (
+      excludeId &&
+      String(slot.id) === String(excludeId)
+    ) {
+      continue;
+    }
+
+    const overlap = isOverlapping(
+      start_time,
+      end_time,
+      slot.start_time,
+      slot.end_time
+    );
+
+    if (!overlap) continue;
+
+    // ---------------------------------------------
+    // TEACHER CONFLICT
+    // ---------------------------------------------
+
+    if (
+      teacher_id &&
+      slot.teacher_id &&
+      String(slot.teacher_id) === String(teacher_id)
+    ) {
+      const teacher = await Teacher.findByPk(
+        teacher_id,
+        {
+          attributes: ["id", "name"],
+        }
+      );
+
+      return {
+        type: "teacher",
+        message: `Teacher ${
+          teacher?.name || "selected teacher"
+        } already has a class from ${
+          slot.start_time
+        } to ${
+          slot.end_time
+        } on ${getDayName(day_of_week)}.`,
+      };
+    }
+
+    // ---------------------------------------------
+    // CLASS CONFLICT
+    // ---------------------------------------------
+
+    if (
+      String(slot.class_id) === String(class_id)
+    ) {
+      return {
+        type: "class",
+        message: `This class already has a class from ${
+          slot.start_time
+        } to ${
+          slot.end_time
+        } on ${getDayName(day_of_week)}.`,
+      };
+    }
+
+    // ---------------------------------------------
+    // ROOM CONFLICT
+    // ---------------------------------------------
+
+    if (
+      slot.room &&
+      slot.room.trim() &&
+      slot.room.trim().toLowerCase() ===
+        String(arguments[0]?.room || "")
+          .trim()
+          .toLowerCase()
+    ) {
+      return {
+        type: "room",
+        message: `Room ${
+          slot.room
+        } is already occupied from ${
+          slot.start_time
+        } to ${
+          slot.end_time
+        } on ${getDayName(day_of_week)}.`,
+      };
+    }
+  }
+
+  return null;
+};
+
+// --------------------------------------------------
+// GET TIMETABLE
 // GET /api/timetable
 // --------------------------------------------------
 
@@ -124,11 +198,18 @@ exports.getTimetable = async (req, res) => {
       include: [
         {
           model: SchoolClass,
-          attributes: ["id", "name", "section"],
+          attributes: [
+            "id",
+            "name",
+            "section",
+          ],
         },
         {
           model: Teacher,
-          attributes: ["id", "name"],
+          attributes: [
+            "id",
+            "name",
+          ],
         },
       ],
 
@@ -139,280 +220,190 @@ exports.getTimetable = async (req, res) => {
       ],
     });
 
-    const result = slots.map((slot) => {
-      const data = slot.toJSON();
+    // Frontend-friendly response
+    const formattedSlots = slots.map(
+      (slot) => {
+        const data = slot.toJSON();
 
-      return {
-        ...data,
+        return {
+          ...data,
 
-        // Frontend friendly values
-        day: DAY_NAMES[data.day_of_week] || data.day_of_week,
+          day:
+            getDayName(
+              data.day_of_week
+            ),
 
-        class: data.SchoolClass || data.class || null,
+          class_id:
+            data.class_id,
 
-        teacher: data.Teacher || data.teacher || null,
-      };
-    });
+          teacher_id:
+            data.teacher_id,
+        };
+      }
+    );
 
-    res.json(result);
+    res.json(formattedSlots);
   } catch (err) {
-    console.error("Get timetable error:", err);
+    console.error(
+      "GET TIMETABLE ERROR:",
+      err
+    );
 
     res.status(500).json({
-      message: "Failed to fetch timetable.",
+      message:
+        "Failed to fetch timetable.",
       error: err.message,
     });
   }
 };
 
 // --------------------------------------------------
+// GET MY TIMETABLE
 // GET /api/timetable/me
 // --------------------------------------------------
 
-exports.getMyTimetable = async (req, res) => {
+exports.getMyTimetable = async (
+  req,
+  res
+) => {
   try {
     let where = {};
 
     if (req.user.role === "student") {
-      const student = await Student.findOne({
-        where: {
-          user_id: req.user.id,
-        },
-      });
+      const student =
+        await Student.findOne({
+          where: {
+            user_id: req.user.id,
+          },
+        });
 
-      if (!student || !student.class_id) {
+      if (
+        !student ||
+        !student.class_id
+      ) {
         return res.json([]);
       }
 
       where = {
-        class_id: student.class_id,
+        class_id:
+          student.class_id,
       };
-    } else if (req.user.role === "teacher") {
-      const teacher = await Teacher.findOne({
-        where: {
-          user_id: req.user.id,
-        },
-      });
+    }
+
+    if (req.user.role === "teacher") {
+      const teacher =
+        await Teacher.findOne({
+          where: {
+            user_id: req.user.id,
+          },
+        });
 
       if (!teacher) {
         return res.json([]);
       }
 
       where = {
-        teacher_id: teacher.id,
+        teacher_id:
+          teacher.id,
       };
     }
 
-    const slots = await TimetableSlot.findAll({
-      where,
+    const slots =
+      await TimetableSlot.findAll({
+        where,
 
-      include: [
-        {
-          model: SchoolClass,
-          attributes: ["id", "name", "section"],
-        },
-        {
-          model: Teacher,
-          attributes: ["id", "name"],
-        },
-      ],
+        include: [
+          {
+            model: SchoolClass,
+            attributes: [
+              "id",
+              "name",
+              "section",
+            ],
+          },
+          {
+            model: Teacher,
+            attributes: [
+              "id",
+              "name",
+            ],
+          },
+        ],
 
-      order: [
-        ["day_of_week", "ASC"],
-        ["start_time", "ASC"],
-        ["period", "ASC"],
-      ],
-    });
+        order: [
+          ["day_of_week", "ASC"],
+          ["start_time", "ASC"],
+          ["period", "ASC"],
+        ],
+      });
 
-    const result = slots.map((slot) => {
-      const data = slot.toJSON();
+    const formattedSlots =
+      slots.map((slot) => {
+        const data =
+          slot.toJSON();
 
-      return {
-        ...data,
+        return {
+          ...data,
 
-        day: DAY_NAMES[data.day_of_week] || data.day_of_week,
+          day:
+            getDayName(
+              data.day_of_week
+            ),
+        };
+      });
 
-        class: data.SchoolClass || data.class || null,
-
-        teacher: data.Teacher || data.teacher || null,
-      };
-    });
-
-    res.json(result);
+    res.json(formattedSlots);
   } catch (err) {
-    console.error("Get my timetable error:", err);
+    console.error(
+      "GET MY TIMETABLE ERROR:",
+      err
+    );
 
     res.status(500).json({
-      message: "Failed to fetch timetable.",
+      message:
+        "Failed to fetch timetable.",
       error: err.message,
     });
   }
 };
 
 // --------------------------------------------------
-// CONFLICT CHECK
-// --------------------------------------------------
-
-async function findConflict({
-  class_id,
-  teacher_id,
-  day_of_week,
-  start_time,
-  end_time,
-  excludeId = null,
-}) {
-  const existingSlots = await TimetableSlot.findAll({
-    where: {
-      day_of_week,
-    },
-
-    include: [
-      {
-        model: SchoolClass,
-        attributes: ["id", "name", "section"],
-      },
-      {
-        model: Teacher,
-        attributes: ["id", "name"],
-      },
-    ],
-  });
-
-  for (const slot of existingSlots) {
-    if (
-      excludeId &&
-      String(slot.id) === String(excludeId)
-    ) {
-      continue;
-    }
-
-    if (
-      !timesOverlap(
-        start_time,
-        end_time,
-        slot.start_time,
-        slot.end_time
-      )
-    ) {
-      continue;
-    }
-
-    // ---------------------------------------------
-    // TEACHER CONFLICT
-    // ---------------------------------------------
-
-    if (
-      teacher_id &&
-      slot.teacher_id &&
-      String(slot.teacher_id) === String(teacher_id)
-    ) {
-      const teacherName =
-        slot.Teacher?.name || "This teacher";
-
-      return {
-        type: "teacher",
-        message:
-          `${teacherName} already has a class ` +
-          `from ${formatTime(
-            slot.start_time
-          )} to ${formatTime(
-            slot.end_time
-          )} on ${
-            DAY_NAMES[day_of_week]
-          }.`,
-        slot,
-      };
-    }
-
-    // ---------------------------------------------
-    // CLASS CONFLICT
-    // ---------------------------------------------
-
-    if (
-      String(slot.class_id) === String(class_id)
-    ) {
-      const className = slot.SchoolClass
-        ? slot.SchoolClass.section
-          ? `${slot.SchoolClass.name} - ${slot.SchoolClass.section}`
-          : slot.SchoolClass.name
-        : "This class";
-
-      return {
-        type: "class",
-        message:
-          `${className} already has a class ` +
-          `from ${formatTime(
-            slot.start_time
-          )} to ${formatTime(
-            slot.end_time
-          )} on ${
-            DAY_NAMES[day_of_week]
-          }.`,
-        slot,
-      };
-    }
-  }
-
-  return null;
-}
-
-// --------------------------------------------------
+// CREATE SLOT
 // POST /api/timetable
 // --------------------------------------------------
 
-exports.createSlot = async (req, res) => {
+exports.createSlot = async (
+  req,
+  res
+) => {
   try {
-    const body = req.body || {};
-
-    const class_id = body.class_id;
-    const teacher_id =
-      body.teacher_id === "" ||
-      body.teacher_id === undefined
-        ? null
-        : body.teacher_id;
-
-    const subject =
-      typeof body.subject === "string"
-        ? body.subject.trim()
-        : body.subject;
-
-    const day_of_week = normalizeDay(
-      body.day_of_week ?? body.day
-    );
-
-    const start_time = body.start_time;
-    const end_time = body.end_time;
-
-    const room =
-      typeof body.room === "string"
-        ? body.room.trim()
-        : body.room || null;
-
-    const period =
-      body.period !== undefined &&
-      body.period !== ""
-        ? Number(body.period)
-        : null;
+    const {
+      class_id,
+      teacher_id,
+      subject,
+      day,
+      day_of_week,
+      period,
+      start_time,
+      end_time,
+      room,
+    } = req.body;
 
     // ---------------------------------------------
-    // VALIDATION
+    // BASIC VALIDATION
     // ---------------------------------------------
 
     if (!class_id) {
       return res.status(400).json({
-        message: "Class is required.",
+        message:
+          "Class is required.",
       });
     }
 
     if (!subject) {
       return res.status(400).json({
-        message: "Subject is required.",
-      });
-    }
-
-    if (!day_of_week) {
-      return res.status(400).json({
-        message: "Valid day is required.",
+        message:
+          "Subject is required.",
       });
     }
 
@@ -423,22 +414,30 @@ exports.createSlot = async (req, res) => {
       });
     }
 
-    const startMinutes =
-      timeToMinutes(start_time);
+    // ---------------------------------------------
+    // DAY
+    // ---------------------------------------------
 
-    const endMinutes =
-      timeToMinutes(end_time);
+    const selectedDay =
+      getDayNumber(
+        day || day_of_week
+      );
 
-    if (
-      startMinutes === null ||
-      endMinutes === null
-    ) {
+    if (!selectedDay) {
       return res.status(400).json({
-        message: "Invalid start or end time.",
+        message:
+          "Valid day is required.",
       });
     }
 
-    if (endMinutes <= startMinutes) {
+    // ---------------------------------------------
+    // TIME
+    // ---------------------------------------------
+
+    if (
+      timeToMinutes(end_time) <=
+      timeToMinutes(start_time)
+    ) {
       return res.status(400).json({
         message:
           "End time must be after start time.",
@@ -449,120 +448,84 @@ exports.createSlot = async (req, res) => {
     // PERIOD
     // ---------------------------------------------
 
-    // Existing database requires period.
-    // If frontend doesn't send it, calculate a
-    // safe period based on start time.
-
-    const finalPeriod =
+    const selectedPeriod =
       period ||
-      Math.floor(startMinutes / 60);
+      Math.floor(
+        timeToMinutes(start_time) /
+          60
+      ) + 1;
 
     // ---------------------------------------------
     // CONFLICT CHECK
     // ---------------------------------------------
 
-    const conflict = await findConflict({
-      class_id,
-      teacher_id,
-      day_of_week,
-      start_time,
-      end_time,
-    });
+    const conflict =
+      await checkConflict({
+        class_id,
+        teacher_id,
+        day_of_week:
+          selectedDay,
+        start_time,
+        end_time,
+      });
 
     if (conflict) {
-      return res.status(409).json({
-        message: conflict.message,
-        conflict_type: conflict.type,
-      });
+      return res.status(409).json(
+        conflict
+      );
     }
 
     // ---------------------------------------------
     // CREATE
     // ---------------------------------------------
 
-    const slot = await TimetableSlot.create({
-      class_id: Number(class_id),
+    const payload = {
+      class_id:
+        Number(class_id),
 
       teacher_id:
-        teacher_id === null
-          ? null
-          : Number(teacher_id),
+        teacher_id
+          ? Number(teacher_id)
+          : null,
 
-      subject,
+      subject:
+        String(subject).trim(),
 
-      day_of_week,
+      day_of_week:
+        selectedDay,
 
-      period: finalPeriod,
+      period:
+        Number(selectedPeriod),
 
       start_time,
-
       end_time,
 
-      room,
-    });
+      room:
+        room
+          ? String(room).trim()
+          : null,
+    };
+
+    const slot =
+      await TimetableSlot.create(
+        payload
+      );
 
     await logAction(req, {
       action: "create",
       entity: "TimetableSlot",
       entityId: slot.id,
-      details: {
-        class_id,
-        teacher_id,
-        subject,
-        day_of_week,
-        period: finalPeriod,
-        start_time,
-        end_time,
-        room,
-      },
+      details: payload,
     });
 
-    const createdSlot =
-      await TimetableSlot.findByPk(
-        slot.id,
-        {
-          include: [
-            {
-              model: SchoolClass,
-              attributes: [
-                "id",
-                "name",
-                "section",
-              ],
-            },
-            {
-              model: Teacher,
-              attributes: [
-                "id",
-                "name",
-              ],
-            },
-          ],
-        }
-      );
-
-    res.status(201).json({
-      ...createdSlot.toJSON(),
-
-      day:
-        DAY_NAMES[
-          createdSlot.day_of_week
-        ] || createdSlot.day_of_week,
-    });
+    res.status(201).json(
+      slot
+    );
   } catch (err) {
     console.error(
-      "Create timetable error:",
+      "CREATE TIMETABLE ERROR:",
       err
     );
-
-    // Sequelize unique constraint
-    if (err.name === "SequelizeUniqueConstraintError") {
-      return res.status(409).json({
-        message:
-          "This class already has a timetable slot for this day and period.",
-        conflict_type: "class_period",
-      });
-    }
 
     res.status(500).json({
       message:
@@ -573,10 +536,14 @@ exports.createSlot = async (req, res) => {
 };
 
 // --------------------------------------------------
+// UPDATE SLOT
 // PUT /api/timetable/:id
 // --------------------------------------------------
 
-exports.updateSlot = async (req, res) => {
+exports.updateSlot = async (
+  req,
+  res
+) => {
   try {
     const slot =
       await TimetableSlot.findByPk(
@@ -585,89 +552,52 @@ exports.updateSlot = async (req, res) => {
 
     if (!slot) {
       return res.status(404).json({
-        message: "Slot not found.",
+        message:
+          "Slot not found.",
       });
     }
 
-    const body = req.body || {};
+    const {
+      class_id,
+      teacher_id,
+      subject,
+      day,
+      day_of_week,
+      period,
+      start_time,
+      end_time,
+      room,
+    } = req.body;
 
-    const class_id =
-      body.class_id ?? slot.class_id;
+    const selectedDay =
+      getDayNumber(
+        day ||
+          day_of_week ||
+          slot.day_of_week
+      );
 
-    const teacher_id =
-      body.teacher_id === "" ||
-      body.teacher_id === undefined
-        ? slot.teacher_id
-        : body.teacher_id;
-
-    const subject =
-      body.subject !== undefined
-        ? String(body.subject).trim()
-        : slot.subject;
-
-    const day_of_week = normalizeDay(
-      body.day_of_week ??
-        body.day ??
-        slot.day_of_week
-    );
-
-    const start_time =
-      body.start_time ??
+    const newStart =
+      start_time ||
       slot.start_time;
 
-    const end_time =
-      body.end_time ??
+    const newEnd =
+      end_time ||
       slot.end_time;
 
-    const room =
-      body.room !== undefined
-        ? String(body.room).trim()
-        : slot.room;
+    const newClassId =
+      class_id ||
+      slot.class_id;
 
-    const period =
-      body.period !== undefined &&
-      body.period !== ""
-        ? Number(body.period)
-        : slot.period;
-
-    // ---------------------------------------------
-    // VALIDATION
-    // ---------------------------------------------
-
-    if (!class_id) {
-      return res.status(400).json({
-        message: "Class is required.",
-      });
-    }
-
-    if (!subject) {
-      return res.status(400).json({
-        message: "Subject is required.",
-      });
-    }
-
-    if (!day_of_week) {
-      return res.status(400).json({
-        message: "Valid day is required.",
-      });
-    }
-
-    const startMinutes =
-      timeToMinutes(start_time);
-
-    const endMinutes =
-      timeToMinutes(end_time);
+    const newTeacherId =
+      teacher_id === ""
+        ? null
+        : teacher_id ??
+          slot.teacher_id;
 
     if (
-      startMinutes === null ||
-      endMinutes === null
+      timeToMinutes(newEnd) <=
+      timeToMinutes(newStart)
     ) {
-      return res.status(400).json({
-        message: "Invalid start or end time.",
-      });
-    }
-
-    if (endMinutes <= startMinutes) {
       return res.status(400).json({
         message:
           "End time must be after start time.",
@@ -678,108 +608,87 @@ exports.updateSlot = async (req, res) => {
     // CONFLICT CHECK
     // ---------------------------------------------
 
-    const conflict = await findConflict({
-      class_id,
-      teacher_id,
-      day_of_week,
-      start_time,
-      end_time,
-      excludeId: slot.id,
-    });
+    const conflict =
+      await checkConflict({
+        class_id:
+          newClassId,
+
+        teacher_id:
+          newTeacherId,
+
+        day_of_week:
+          selectedDay,
+
+        start_time:
+          newStart,
+
+        end_time:
+          newEnd,
+
+        excludeId:
+          slot.id,
+      });
 
     if (conflict) {
-      return res.status(409).json({
-        message: conflict.message,
-        conflict_type: conflict.type,
-      });
+      return res.status(409).json(
+        conflict
+      );
     }
 
     // ---------------------------------------------
     // UPDATE
     // ---------------------------------------------
 
-    await slot.update({
-      class_id: Number(class_id),
+    const payload = {
+      class_id:
+        Number(newClassId),
 
       teacher_id:
-        teacher_id === null
-          ? null
-          : Number(teacher_id),
+        newTeacherId
+          ? Number(newTeacherId)
+          : null,
 
-      subject,
+      subject:
+        subject !== undefined
+          ? String(subject).trim()
+          : slot.subject,
 
-      day_of_week,
+      day_of_week:
+        selectedDay,
 
-      period,
+      period:
+        period ||
+        slot.period,
 
-      start_time,
+      start_time:
+        newStart,
 
-      end_time,
+      end_time:
+        newEnd,
 
-      room,
-    });
+      room:
+        room !== undefined
+          ? String(room).trim()
+          : slot.room,
+    };
+
+    await slot.update(
+      payload
+    );
 
     await logAction(req, {
       action: "update",
       entity: "TimetableSlot",
       entityId: slot.id,
-      details: {
-        class_id,
-        teacher_id,
-        subject,
-        day_of_week,
-        period,
-        start_time,
-        end_time,
-        room,
-      },
+      details: payload,
     });
 
-    const updatedSlot =
-      await TimetableSlot.findByPk(
-        slot.id,
-        {
-          include: [
-            {
-              model: SchoolClass,
-              attributes: [
-                "id",
-                "name",
-                "section",
-              ],
-            },
-            {
-              model: Teacher,
-              attributes: [
-                "id",
-                "name",
-              ],
-            },
-          ],
-        }
-      );
-
-    res.json({
-      ...updatedSlot.toJSON(),
-
-      day:
-        DAY_NAMES[
-          updatedSlot.day_of_week
-        ] || updatedSlot.day_of_week,
-    });
+    res.json(slot);
   } catch (err) {
     console.error(
-      "Update timetable error:",
+      "UPDATE TIMETABLE ERROR:",
       err
     );
-
-    if (err.name === "SequelizeUniqueConstraintError") {
-      return res.status(409).json({
-        message:
-          "This class already has a timetable slot for this day and period.",
-        conflict_type: "class_period",
-      });
-    }
 
     res.status(500).json({
       message:
@@ -790,10 +699,14 @@ exports.updateSlot = async (req, res) => {
 };
 
 // --------------------------------------------------
+// DELETE SLOT
 // DELETE /api/timetable/:id
 // --------------------------------------------------
 
-exports.deleteSlot = async (req, res) => {
+exports.deleteSlot = async (
+  req,
+  res
+) => {
   try {
     const slot =
       await TimetableSlot.findByPk(
@@ -802,7 +715,8 @@ exports.deleteSlot = async (req, res) => {
 
     if (!slot) {
       return res.status(404).json({
-        message: "Slot not found.",
+        message:
+          "Slot not found.",
       });
     }
 
@@ -815,11 +729,12 @@ exports.deleteSlot = async (req, res) => {
     await slot.destroy();
 
     res.json({
-      message: "Slot deleted.",
+      message:
+        "Slot deleted successfully.",
     });
   } catch (err) {
     console.error(
-      "Delete timetable error:",
+      "DELETE TIMETABLE ERROR:",
       err
     );
 
