@@ -7,29 +7,11 @@ const {
 
 const { logAction } = require("../utils/audit");
 
-const DAY_MAP = {
-  Monday: 1,
-  Tuesday: 2,
-  Wednesday: 3,
-  Thursday: 4,
-  Friday: 5,
-  Saturday: 6,
-};
-
-const DAY_NAME = {
-  1: "Monday",
-  2: "Tuesday",
-  3: "Wednesday",
-  4: "Thursday",
-  5: "Friday",
-  6: "Saturday",
-};
-
 // --------------------------------------------------
 // HELPERS
 // --------------------------------------------------
 
-const timeToMinutes = (time) => {
+const getTimeMinutes = (time) => {
   if (!time) return 0;
 
   const [hours, minutes] = String(time)
@@ -40,48 +22,40 @@ const timeToMinutes = (time) => {
   return hours * 60 + minutes;
 };
 
-const isOverlapping = (
+const isTimeOverlap = (
   startA,
   endA,
   startB,
   endB
 ) => {
   return (
-    timeToMinutes(startA) < timeToMinutes(endB) &&
-    timeToMinutes(endA) > timeToMinutes(startB)
+    getTimeMinutes(startA) <
+      getTimeMinutes(endB) &&
+    getTimeMinutes(endA) >
+      getTimeMinutes(startB)
   );
 };
 
-const getDayNumber = (day) => {
-  if (typeof day === "number") return day;
-
-  return DAY_MAP[day] || null;
-};
-
-const getDayName = (day) => {
-  return DAY_NAME[day] || day;
-};
-
 // --------------------------------------------------
-// CHECK CONFLICT
+// CHECK TEACHER / CLASS CONFLICT
 // --------------------------------------------------
 
 const checkConflict = async ({
   class_id,
   teacher_id,
-  day_of_week,
+  day,
   start_time,
   end_time,
   excludeId = null,
 }) => {
-  const existingSlots = await TimetableSlot.findAll({
+  const slots = await TimetableSlot.findAll({
     where: {
-      day_of_week,
+      day,
     },
   });
 
-  for (const slot of existingSlots) {
-    // Current slot ko ignore karo during edit
+  for (const slot of slots) {
+    // Current slot ko ignore karo while editing
     if (
       excludeId &&
       String(slot.id) === String(excludeId)
@@ -89,81 +63,37 @@ const checkConflict = async ({
       continue;
     }
 
-    const overlap = isOverlapping(
+    const overlap = isTimeOverlap(
       start_time,
       end_time,
       slot.start_time,
       slot.end_time
     );
 
-    if (!overlap) continue;
+    if (!overlap) {
+      continue;
+    }
 
-    // ---------------------------------------------
-    // TEACHER CONFLICT
-    // ---------------------------------------------
-
+    // Teacher conflict
     if (
       teacher_id &&
-      slot.teacher_id &&
       String(slot.teacher_id) === String(teacher_id)
     ) {
-      const teacher = await Teacher.findByPk(
-        teacher_id,
-        {
-          attributes: ["id", "name"],
-        }
-      );
-
       return {
         type: "teacher",
-        message: `Teacher ${
-          teacher?.name || "selected teacher"
-        } already has a class from ${
-          slot.start_time
-        } to ${
-          slot.end_time
-        } on ${getDayName(day_of_week)}.`,
+        message:
+          "This teacher already has another class during this time.",
       };
     }
 
-    // ---------------------------------------------
-    // CLASS CONFLICT
-    // ---------------------------------------------
-
+    // Class conflict
     if (
       String(slot.class_id) === String(class_id)
     ) {
       return {
         type: "class",
-        message: `This class already has a class from ${
-          slot.start_time
-        } to ${
-          slot.end_time
-        } on ${getDayName(day_of_week)}.`,
-      };
-    }
-
-    // ---------------------------------------------
-    // ROOM CONFLICT
-    // ---------------------------------------------
-
-    if (
-      slot.room &&
-      slot.room.trim() &&
-      slot.room.trim().toLowerCase() ===
-        String(arguments[0]?.room || "")
-          .trim()
-          .toLowerCase()
-    ) {
-      return {
-        type: "room",
-        message: `Room ${
-          slot.room
-        } is already occupied from ${
-          slot.start_time
-        } to ${
-          slot.end_time
-        } on ${getDayName(day_of_week)}.`,
+        message:
+          "This class already has another subject during this time.",
       };
     }
   }
@@ -172,7 +102,7 @@ const checkConflict = async ({
 };
 
 // --------------------------------------------------
-// GET TIMETABLE
+// GET ALL TIMETABLE
 // GET /api/timetable
 // --------------------------------------------------
 
@@ -188,8 +118,8 @@ exports.getTimetable = async (req, res) => {
       where.teacher_id = req.query.teacher_id;
     }
 
-    if (req.query.day_of_week) {
-      where.day_of_week = req.query.day_of_week;
+    if (req.query.day) {
+      where.day = req.query.day;
     }
 
     const slots = await TimetableSlot.findAll({
@@ -214,44 +144,20 @@ exports.getTimetable = async (req, res) => {
       ],
 
       order: [
-        ["day_of_week", "ASC"],
+        ["day", "ASC"],
         ["start_time", "ASC"],
-        ["period", "ASC"],
       ],
     });
 
-    // Frontend-friendly response
-    const formattedSlots = slots.map(
-      (slot) => {
-        const data = slot.toJSON();
-
-        return {
-          ...data,
-
-          day:
-            getDayName(
-              data.day_of_week
-            ),
-
-          class_id:
-            data.class_id,
-
-          teacher_id:
-            data.teacher_id,
-        };
-      }
-    );
-
-    res.json(formattedSlots);
+    res.json(slots);
   } catch (err) {
     console.error(
-      "GET TIMETABLE ERROR:",
+      "Get timetable error:",
       err
     );
 
     res.status(500).json({
-      message:
-        "Failed to fetch timetable.",
+      message: "Failed to fetch timetable.",
       error: err.message,
     });
   }
@@ -269,6 +175,7 @@ exports.getMyTimetable = async (
   try {
     let where = {};
 
+    // Student
     if (req.user.role === "student") {
       const student =
         await Student.findOne({
@@ -284,13 +191,13 @@ exports.getMyTimetable = async (
         return res.json([]);
       }
 
-      where = {
-        class_id:
-          student.class_id,
-      };
+      where.class_id = student.class_id;
     }
 
-    if (req.user.role === "teacher") {
+    // Teacher
+    else if (
+      req.user.role === "teacher"
+    ) {
       const teacher =
         await Teacher.findOne({
           where: {
@@ -302,10 +209,7 @@ exports.getMyTimetable = async (
         return res.json([]);
       }
 
-      where = {
-        teacher_id:
-          teacher.id,
-      };
+      where.teacher_id = teacher.id;
     }
 
     const slots =
@@ -331,44 +235,28 @@ exports.getMyTimetable = async (
         ],
 
         order: [
-          ["day_of_week", "ASC"],
+          ["day", "ASC"],
           ["start_time", "ASC"],
-          ["period", "ASC"],
         ],
       });
 
-    const formattedSlots =
-      slots.map((slot) => {
-        const data =
-          slot.toJSON();
-
-        return {
-          ...data,
-
-          day:
-            getDayName(
-              data.day_of_week
-            ),
-        };
-      });
-
-    res.json(formattedSlots);
+    res.json(slots);
   } catch (err) {
     console.error(
-      "GET MY TIMETABLE ERROR:",
+      "Get my timetable error:",
       err
     );
 
     res.status(500).json({
       message:
-        "Failed to fetch timetable.",
+        "Failed to fetch my timetable.",
       error: err.message,
     });
   }
 };
 
 // --------------------------------------------------
-// CREATE SLOT
+// CREATE TIMETABLE
 // POST /api/timetable
 // --------------------------------------------------
 
@@ -382,61 +270,30 @@ exports.createSlot = async (
       teacher_id,
       subject,
       day,
-      day_of_week,
-      period,
       start_time,
       end_time,
       room,
     } = req.body;
 
-    // ---------------------------------------------
-    // BASIC VALIDATION
-    // ---------------------------------------------
-
-    if (!class_id) {
-      return res.status(400).json({
-        message:
-          "Class is required.",
-      });
-    }
-
-    if (!subject) {
-      return res.status(400).json({
-        message:
-          "Subject is required.",
-      });
-    }
-
-    if (!start_time || !end_time) {
-      return res.status(400).json({
-        message:
-          "Start time and end time are required.",
-      });
-    }
-
-    // ---------------------------------------------
-    // DAY
-    // ---------------------------------------------
-
-    const selectedDay =
-      getDayNumber(
-        day || day_of_week
-      );
-
-    if (!selectedDay) {
-      return res.status(400).json({
-        message:
-          "Valid day is required.",
-      });
-    }
-
-    // ---------------------------------------------
-    // TIME
-    // ---------------------------------------------
-
+    // Basic validation
     if (
-      timeToMinutes(end_time) <=
-      timeToMinutes(start_time)
+      !class_id ||
+      !teacher_id ||
+      !subject ||
+      !day ||
+      !start_time ||
+      !end_time
+    ) {
+      return res.status(400).json({
+        message:
+          "Class, teacher, subject, day, start time and end time are required.",
+      });
+    }
+
+    // Time validation
+    if (
+      getTimeMinutes(end_time) <=
+      getTimeMinutes(start_time)
     ) {
       return res.status(400).json({
         message:
@@ -444,66 +301,34 @@ exports.createSlot = async (
       });
     }
 
-    // ---------------------------------------------
-    // PERIOD
-    // ---------------------------------------------
-
-    const selectedPeriod =
-      period ||
-      Math.floor(
-        timeToMinutes(start_time) /
-          60
-      ) + 1;
-
-    // ---------------------------------------------
-    // CONFLICT CHECK
-    // ---------------------------------------------
-
+    // Conflict check
     const conflict =
       await checkConflict({
         class_id,
         teacher_id,
-        day_of_week:
-          selectedDay,
+        day,
         start_time,
         end_time,
       });
 
     if (conflict) {
-      return res.status(409).json(
-        conflict
-      );
+      return res.status(409).json({
+        message: conflict.message,
+        conflict_type:
+          conflict.type,
+      });
     }
 
-    // ---------------------------------------------
-    // CREATE
-    // ---------------------------------------------
-
     const payload = {
-      class_id:
-        Number(class_id),
-
-      teacher_id:
-        teacher_id
-          ? Number(teacher_id)
-          : null,
-
-      subject:
-        String(subject).trim(),
-
-      day_of_week:
-        selectedDay,
-
-      period:
-        Number(selectedPeriod),
-
+      class_id,
+      teacher_id,
+      subject: subject.trim(),
+      day,
       start_time,
       end_time,
-
-      room:
-        room
-          ? String(room).trim()
-          : null,
+      room: room
+        ? room.trim()
+        : null,
     };
 
     const slot =
@@ -518,12 +343,10 @@ exports.createSlot = async (
       details: payload,
     });
 
-    res.status(201).json(
-      slot
-    );
+    res.status(201).json(slot);
   } catch (err) {
     console.error(
-      "CREATE TIMETABLE ERROR:",
+      "Create timetable error:",
       err
     );
 
@@ -536,7 +359,7 @@ exports.createSlot = async (
 };
 
 // --------------------------------------------------
-// UPDATE SLOT
+// UPDATE TIMETABLE
 // PUT /api/timetable/:id
 // --------------------------------------------------
 
@@ -553,7 +376,7 @@ exports.updateSlot = async (
     if (!slot) {
       return res.status(404).json({
         message:
-          "Slot not found.",
+          "Timetable slot not found.",
       });
     }
 
@@ -562,41 +385,28 @@ exports.updateSlot = async (
       teacher_id,
       subject,
       day,
-      day_of_week,
-      period,
       start_time,
       end_time,
       room,
     } = req.body;
 
-    const selectedDay =
-      getDayNumber(
-        day ||
-          day_of_week ||
-          slot.day_of_week
-      );
-
-    const newStart =
-      start_time ||
-      slot.start_time;
-
-    const newEnd =
-      end_time ||
-      slot.end_time;
-
-    const newClassId =
-      class_id ||
-      slot.class_id;
-
-    const newTeacherId =
-      teacher_id === ""
-        ? null
-        : teacher_id ??
-          slot.teacher_id;
+    if (
+      !class_id ||
+      !teacher_id ||
+      !subject ||
+      !day ||
+      !start_time ||
+      !end_time
+    ) {
+      return res.status(400).json({
+        message:
+          "Class, teacher, subject, day, start time and end time are required.",
+      });
+    }
 
     if (
-      timeToMinutes(newEnd) <=
-      timeToMinutes(newStart)
+      getTimeMinutes(end_time) <=
+      getTimeMinutes(start_time)
     ) {
       return res.status(400).json({
         message:
@@ -604,77 +414,38 @@ exports.updateSlot = async (
       });
     }
 
-    // ---------------------------------------------
-    // CONFLICT CHECK
-    // ---------------------------------------------
-
+    // Conflict check excluding current slot
     const conflict =
       await checkConflict({
-        class_id:
-          newClassId,
-
-        teacher_id:
-          newTeacherId,
-
-        day_of_week:
-          selectedDay,
-
-        start_time:
-          newStart,
-
-        end_time:
-          newEnd,
-
-        excludeId:
-          slot.id,
+        class_id,
+        teacher_id,
+        day,
+        start_time,
+        end_time,
+        excludeId: slot.id,
       });
 
     if (conflict) {
-      return res.status(409).json(
-        conflict
-      );
+      return res.status(409).json({
+        message: conflict.message,
+        conflict_type:
+          conflict.type,
+      });
     }
 
-    // ---------------------------------------------
-    // UPDATE
-    // ---------------------------------------------
-
     const payload = {
-      class_id:
-        Number(newClassId),
-
-      teacher_id:
-        newTeacherId
-          ? Number(newTeacherId)
-          : null,
-
-      subject:
-        subject !== undefined
-          ? String(subject).trim()
-          : slot.subject,
-
-      day_of_week:
-        selectedDay,
-
-      period:
-        period ||
-        slot.period,
-
-      start_time:
-        newStart,
-
-      end_time:
-        newEnd,
-
-      room:
-        room !== undefined
-          ? String(room).trim()
-          : slot.room,
+      class_id,
+      teacher_id,
+      subject: subject.trim(),
+      day,
+      start_time,
+      end_time,
+      room: room
+        ? room.trim()
+        : null,
     };
 
-    await slot.update(
-      payload
-    );
+    await slot.update(payload);
 
     await logAction(req, {
       action: "update",
@@ -686,7 +457,7 @@ exports.updateSlot = async (
     res.json(slot);
   } catch (err) {
     console.error(
-      "UPDATE TIMETABLE ERROR:",
+      "Update timetable error:",
       err
     );
 
@@ -699,7 +470,7 @@ exports.updateSlot = async (
 };
 
 // --------------------------------------------------
-// DELETE SLOT
+// DELETE TIMETABLE
 // DELETE /api/timetable/:id
 // --------------------------------------------------
 
@@ -716,7 +487,7 @@ exports.deleteSlot = async (
     if (!slot) {
       return res.status(404).json({
         message:
-          "Slot not found.",
+          "Timetable slot not found.",
       });
     }
 
@@ -730,11 +501,11 @@ exports.deleteSlot = async (
 
     res.json({
       message:
-        "Slot deleted successfully.",
+        "Timetable slot deleted successfully.",
     });
   } catch (err) {
     console.error(
-      "DELETE TIMETABLE ERROR:",
+      "Delete timetable error:",
       err
     );
 
