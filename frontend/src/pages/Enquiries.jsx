@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { UserPlus, Filter } from "lucide-react";
 import DashboardLayout from "../components/DashboardLayout";
-import DataTable from "../components/DataTable";
 import api from "../api/axios";
 
 const STATUS_OPTIONS = [
@@ -21,25 +20,20 @@ const STATUS_STYLE = {
 export default function Enquiries() {
   const [enquiries, setEnquiries] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  // Status filter
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const load = () => {
+  const load = async () => {
     setLoading(true);
 
-    api
-      .get("/enquiries")
-      .then((res) => {
-        setEnquiries(res.data || []);
-      })
-      .catch((err) => {
-        console.error("Failed to load enquiries:", err);
-        setEnquiries([]);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      const res = await api.get("/enquiries");
+      setEnquiries(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Failed to load enquiries:", err);
+      setEnquiries([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -49,15 +43,12 @@ export default function Enquiries() {
   const updateStatus = async (id, status) => {
     try {
       await api.put(`/enquiries/${id}`, { status });
-      load();
+      await load();
     } catch (err) {
       console.error("Failed to update enquiry status:", err);
     }
   };
 
-  // ---------------------------------------------
-  // FILTER ENQUIRIES BY STATUS
-  // ---------------------------------------------
   const filteredEnquiries =
     statusFilter === "all"
       ? enquiries
@@ -65,104 +56,17 @@ export default function Enquiries() {
           (enquiry) => enquiry.status === statusFilter
         );
 
-  // ---------------------------------------------
-  // TABLE COLUMNS
-  // ---------------------------------------------
-  const columns = [
-    {
-      key: "name",
-      label: "Name",
-      render: (e) => (
-        <span className="font-medium text-navy-900">
-          {e.name || "—"}
-        </span>
-      ),
-    },
-
-    {
-      key: "phone",
-      label: "Phone",
-      render: (e) => e.phone || "—",
-    },
-
-    {
-      key: "email",
-      label: "Email",
-      render: (e) => e.email || "—",
-    },
-
-    {
-      key: "class_applying",
-      label: "Class Applying",
-      render: (e) => e.class_applying || "—",
-    },
-
-    {
-      key: "message",
-      label: "Message",
-      render: (e) => (
-        <span
-          className="block max-w-xs truncate"
-          title={e.message || ""}
-        >
-          {e.message || "—"}
-        </span>
-      ),
-    },
-
-    {
-      key: "status",
-      label: "Status",
-      render: (e) => (
-        <select
-          value={e.status || "new"}
-          onChange={(ev) =>
-            updateStatus(e.id, ev.target.value)
-          }
-          className={`badge ${
-            STATUS_STYLE[e.status] || "badge-gray"
-          } capitalize border-0 cursor-pointer outline-none`}
-        >
-          {STATUS_OPTIONS.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
-      ),
-    },
-
-    {
-      key: "created_at",
-      label: "Received",
-      render: (e) => {
-        if (!e.created_at) return "—";
-
-        const date = new Date(e.created_at);
-
-        if (Number.isNaN(date.getTime())) {
-          return "Invalid Date";
-        }
-
-        return date.toLocaleDateString();
-      },
-    },
-  ];
-
   return (
-    <DashboardLayout title="Admissions / Enquiries">
+    <DashboardLayout title="Admission Enquiries">
       <div className="space-y-5">
 
-        {/* ------------------------------------------------ */}
-        {/* PAGE DESCRIPTION */}
-        {/* ------------------------------------------------ */}
-
-        <div className="flex items-center gap-2 text-sm text-navy-900/70">
+        {/* Page description */}
+        <div className="flex flex-wrap items-center gap-2 text-sm text-navy-900/70">
           <UserPlus size={18} />
 
           <span>
-            Manage enquiries from prospective students. Share the
-            public form link:
+            Manage enquiries from prospective students.
+            Share the public form link:
           </span>
 
           <span className="font-mono text-xs bg-[#f7f8fa] px-2 py-1 rounded-md text-navy-900">
@@ -170,60 +74,43 @@ export default function Enquiries() {
           </span>
         </div>
 
-        {/* ------------------------------------------------ */}
-        {/* STATUS FILTER */}
-        {/* ------------------------------------------------ */}
+        {/* Status Filter */}
+        <div className="card p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Filter
+                size={17}
+                className="text-navy-900/50"
+              />
 
-          <div className="flex items-center gap-2">
-            <Filter
-              size={17}
-              className="text-navy-900/50"
-            />
+              <div>
+                <p className="text-sm font-semibold text-navy-900">
+                  Filter Enquiries
+                </p>
 
-            <span className="text-sm font-semibold text-navy-900">
-              Filter by Status
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
+                <p className="text-xs text-navy-900/50">
+                  Filter enquiries by their current status.
+                </p>
+              </div>
+            </div>
 
             <select
               value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value)
-              }
-              className="form-input w-full sm:w-48"
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="form-input w-full sm:w-52"
             >
-              <option value="all">
-                All Statuses
-              </option>
-
-              <option value="new">
-                New
-              </option>
-
-              <option value="contacted">
-                Contacted
-              </option>
-
-              <option value="converted">
-                Converted
-              </option>
-
-              <option value="rejected">
-                Rejected
-              </option>
+              <option value="all">All Statuses</option>
+              <option value="new">New</option>
+              <option value="contacted">Contacted</option>
+              <option value="converted">Converted</option>
+              <option value="rejected">Rejected</option>
             </select>
 
           </div>
         </div>
 
-        {/* ------------------------------------------------ */}
-        {/* RESULT COUNT */}
-        {/* ------------------------------------------------ */}
-
+        {/* Result count */}
         {!loading && (
           <div className="text-xs text-navy-900/50">
             Showing{" "}
@@ -238,19 +125,123 @@ export default function Enquiries() {
           </div>
         )}
 
-        {/* ------------------------------------------------ */}
-        {/* DATA TABLE */}
-        {/* ------------------------------------------------ */}
-
+        {/* Loading */}
         {loading ? (
           <div className="card p-8 text-center text-sm text-navy-900/40">
-            Loading...
+            Loading enquiries...
+          </div>
+        ) : filteredEnquiries.length === 0 ? (
+          <div className="card p-8 text-center">
+            <UserPlus
+              size={32}
+              className="mx-auto mb-3 text-navy-900/20"
+            />
+
+            <p className="text-sm font-semibold text-navy-900">
+              No enquiries found
+            </p>
+
+            <p className="text-xs text-navy-900/40 mt-1">
+              Try selecting a different status filter.
+            </p>
           </div>
         ) : (
-          <DataTable
-            columns={columns}
-            data={filteredEnquiries}
-          />
+          /* Enquiries Table */
+          <div className="card overflow-hidden">
+            <div className="overflow-x-auto">
+
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Phone</th>
+                    <th>Email</th>
+                    <th>Class Applying</th>
+                    <th>Message</th>
+                    <th>Status</th>
+                    <th>Received</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {filteredEnquiries.map((enquiry) => (
+                    <tr key={enquiry.id}>
+
+                      {/* Name */}
+                      <td>
+                        <span className="font-semibold">
+                          {enquiry.name || "—"}
+                        </span>
+                      </td>
+
+                      {/* Phone */}
+                      <td>
+                        {enquiry.phone || "—"}
+                      </td>
+
+                      {/* Email */}
+                      <td>
+                        {enquiry.email || "—"}
+                      </td>
+
+                      {/* Class */}
+                      <td>
+                        {enquiry.class_applying || "—"}
+                      </td>
+
+                      {/* Message */}
+                      <td>
+                        <span
+                          className="block max-w-xs truncate"
+                          title={enquiry.message || ""}
+                        >
+                          {enquiry.message || "—"}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td>
+                        <select
+                          value={enquiry.status || "new"}
+                          onChange={(e) =>
+                            updateStatus(
+                              enquiry.id,
+                              e.target.value
+                            )
+                          }
+                          className={`badge ${
+                            STATUS_STYLE[
+                              enquiry.status
+                            ] || "badge-gray"
+                          } capitalize border-0 cursor-pointer outline-none`}
+                        >
+                          {STATUS_OPTIONS.map((status) => (
+                            <option
+                              key={status}
+                              value={status}
+                            >
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+
+                      {/* Date */}
+                      <td>
+                        {enquiry.created_at
+                          ? new Date(
+                              enquiry.created_at
+                            ).toLocaleDateString()
+                          : "—"}
+                      </td>
+
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+            </div>
+          </div>
         )}
 
       </div>
