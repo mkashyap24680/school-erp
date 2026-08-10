@@ -6,12 +6,11 @@ import {
   BookOpen,
   CalendarCheck,
   Wallet,
-  UserRound,
   Building2,
   CalendarDays,
   Layers3,
-  Bell,
   Megaphone,
+  ArrowRight,
   Clock,
 } from "lucide-react";
 
@@ -24,6 +23,7 @@ export default function Dashboard() {
   const { user } = useAuth();
 
   const [stats, setStats] = useState(null);
+  const [latestAnnouncement, setLatestAnnouncement] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const isStudent = user?.role === "student";
@@ -37,10 +37,26 @@ export default function Dashboard() {
   useEffect(() => {
     setLoading(true);
 
-    api
-      .get("/dashboard/stats")
-      .then((res) => {
-        setStats(res.data);
+    const requests = [
+      api.get("/dashboard/stats"),
+      api.get("/announcements"),
+    ];
+
+    Promise.all(requests)
+      .then(([statsRes, announcementsRes]) => {
+        setStats(statsRes.data);
+
+        // Get latest announcement only
+        const announcements = announcementsRes?.data || [];
+
+        const sortedAnnouncements = [...announcements].sort(
+          (a, b) =>
+            new Date(b.created_at) - new Date(a.created_at)
+        );
+
+        setLatestAnnouncement(
+          sortedAnnouncements[0] || null
+        );
       })
       .catch((err) => {
         console.error("Dashboard loading error:", err);
@@ -121,6 +137,7 @@ export default function Dashboard() {
                       </p>
                     )}
                   </div>
+
                 </div>
               </div>
 
@@ -145,7 +162,7 @@ export default function Dashboard() {
                 </div>
 
                 {!academic ? (
-                  <div className="rounded-xl border border-[#eef0f4] dark:border-[#1e2947] p-5 text-sm text-navy-900/50">
+                  <div className="rounded-xl border border-[#eef0f4] p-5 text-sm text-navy-900/50">
                     No class has been assigned to your
                     student profile yet.
                   </div>
@@ -201,9 +218,16 @@ export default function Dashboard() {
                           : "—"
                       }
                     />
+
                   </div>
                 )}
               </div>
+
+              {/* Current Announcement */}
+              <CurrentAnnouncement
+                announcement={latestAnnouncement}
+                loading={loading}
+              />
 
               {/* Quick Links */}
               <div className="card p-5">
@@ -244,7 +268,7 @@ export default function Dashboard() {
   }
 
   // --------------------------------------------------
-  // ADMIN / MANAGEMENT / TEACHER DASHBOARD
+  // ADMIN / MANAGEMENT / TEACHER / OTHER DASHBOARD
   // --------------------------------------------------
 
   return (
@@ -253,237 +277,295 @@ export default function Dashboard() {
         user?.name?.split(" ")[0] || ""
       }`}
     >
+      <div className="space-y-6">
 
-      {/* ---------------------------------------------- */}
-      {/* User without dashboard statistics */}
-      {/* ---------------------------------------------- */}
+        {/* Other roles */}
+        {!canSeeStats && (
+          <div className="card p-5">
 
-      {!canSeeStats && (
-        <div className="card p-5">
+            <h2 className="text-xl font-bold text-navy-900">
+              Dashboard
+            </h2>
 
-          <h2 className="text-xl font-bold text-navy-900">
-            Dashboard
-          </h2>
+            <p className="text-sm text-navy-900/50 mt-1">
+              Use the sidebar to view your available
+              modules.
+            </p>
 
-          <p className="text-sm text-navy-900/50 mt-1">
-            Use the sidebar to view your available
-            modules.
-          </p>
-
-          {user?.role === "parent" && (
-            <div className="mt-4">
-              <Link
-                to="/parents"
-                className="btn-primary inline-flex"
-              >
-                View My Children →
-              </Link>
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* ---------------------------------------------- */}
-      {/* Admin / Management / Teacher */}
-      {/* ---------------------------------------------- */}
-
-      {canSeeStats && (
-        <>
-          {/* Statistics */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-
-            <StatCard
-              icon={Users}
-              label="Students"
-              value={
-                loading
-                  ? "…"
-                  : stats?.students ?? 0
-              }
-              color="brand"
-            />
-
-            <StatCard
-              icon={GraduationCap}
-              label="Teachers"
-              value={
-                loading
-                  ? "…"
-                  : stats?.teachers ?? 0
-              }
-              color="blue"
-            />
-
-            <StatCard
-              icon={BookOpen}
-              label="Classes"
-              value={
-                loading
-                  ? "…"
-                  : stats?.classes ?? 0
-              }
-              color="purple"
-            />
-
-            <StatCard
-              icon={CalendarCheck}
-              label="Attendance Today"
-              value={
-                loading
-                  ? "…"
-                  : `${stats?.attendancePercent ?? 0}%`
-              }
-              color="orange"
-            />
-
-            <StatCard
-              icon={Wallet}
-              label="Pending Fees"
-              value={
-                loading
-                  ? "…"
-                  : stats?.pendingFees ?? 0
-              }
-              color="red"
-            />
+            {user?.role === "parent" && (
+              <div className="mt-4">
+                <Link
+                  to="/parents"
+                  className="btn-primary inline-flex"
+                >
+                  View My Children →
+                </Link>
+              </div>
+            )}
 
           </div>
+        )}
 
-          {/* ------------------------------------------ */}
-          {/* Announcements + Quick Links */}
-          {/* ------------------------------------------ */}
+        {canSeeStats && (
+          <>
+            {/* Statistics */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <StatCard
+                icon={Users}
+                label="Students"
+                value={
+                  loading
+                    ? "…"
+                    : stats?.students ?? 0
+                }
+                color="brand"
+              />
 
-            {/* Announcements */}
-            <div className="card p-5 lg:col-span-2">
+              <StatCard
+                icon={GraduationCap}
+                label="Teachers"
+                value={
+                  loading
+                    ? "…"
+                    : stats?.teachers ?? 0
+                }
+                color="blue"
+              />
 
-              {/* Header */}
-              <div className="flex items-center justify-between mb-5">
+              <StatCard
+                icon={BookOpen}
+                label="Classes"
+                value={
+                  loading
+                    ? "…"
+                    : stats?.classes ?? 0
+                }
+                color="purple"
+              />
 
-                <div className="flex items-center gap-3">
+              <StatCard
+                icon={CalendarCheck}
+                label="Attendance Today"
+                value={
+                  loading
+                    ? "…"
+                    : `${stats?.attendancePercent ?? 0}%`
+                }
+                color="orange"
+              />
 
-                  <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
-                    <Megaphone size={20} />
-                  </div>
-
-                  <div>
-                    <h3 className="font-bold text-navy-900">
-                      Announcements
-                    </h3>
-
-                    <p className="text-xs text-navy-900/50 mt-0.5">
-                      Latest school announcements
-                    </p>
-                  </div>
-
-                </div>
-
-                <Link
-                  to="/announcements"
-                  className="text-sm font-semibold text-brand-600 hover:underline"
-                >
-                  View All →
-                </Link>
-
-              </div>
-
-              {/* Announcement List */}
-              <div className="space-y-3">
-
-                <AnnouncementItem
-                  title="Semester Examination Schedule Released"
-                  description="The examination schedule for the upcoming semester has been published. Please check the examination section for complete details."
-                  date="Aug 10, 2026"
-                  audience="All"
-                  priority="Important"
-                />
-
-                <AnnouncementItem
-                  title="Independence Day Holiday"
-                  description="The school will remain closed on August 15 due to Independence Day."
-                  date="Aug 09, 2026"
-                  audience="All"
-                  priority="Normal"
-                />
-
-                <AnnouncementItem
-                  title="Faculty Meeting"
-                  description="Monthly faculty meeting will be held at 3:00 PM in the conference room."
-                  date="Aug 08, 2026"
-                  audience="Teachers"
-                  priority="Important"
-                />
-
-                <AnnouncementItem
-                  title="Fee Payment Reminder"
-                  description="Students with pending fees are requested to complete their fee payment before the due date."
-                  date="Aug 07, 2026"
-                  audience="Students"
-                  priority="Urgent"
-                />
-
-              </div>
+              <StatCard
+                icon={Wallet}
+                label="Pending Fees"
+                value={
+                  loading
+                    ? "…"
+                    : stats?.pendingFees ?? 0
+                }
+                color="red"
+              />
 
             </div>
 
-            {/* Quick Links */}
-            <div className="card p-5">
+            {/* Current Announcement + Quick Links */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-              <div className="flex items-center gap-2 mb-4">
+              {/* Current Announcement */}
+              <CurrentAnnouncement
+                announcement={latestAnnouncement}
+                loading={loading}
+                large
+              />
 
-                <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center">
-                  <Bell size={18} />
-                </div>
+              {/* Quick Links */}
+              <div className="card p-5">
 
-                <h3 className="font-bold text-navy-900">
+                <h3 className="font-bold text-navy-900 mb-4">
                   Quick Links
                 </h3>
 
+                <ul className="space-y-3 text-sm">
+
+                  <QuickLink
+                    label="Add new student"
+                    to="/students"
+                  />
+
+                  <QuickLink
+                    label="Mark today's attendance"
+                    to="/attendance"
+                  />
+
+                  <QuickLink
+                    label="Record fee payment"
+                    to="/fees"
+                  />
+
+                  <QuickLink
+                    label="Create an exam"
+                    to="/exams"
+                  />
+
+                  <QuickLink
+                    label="View reports"
+                    to="/reports"
+                  />
+
+                </ul>
               </div>
 
-              <ul className="space-y-3 text-sm">
-
-                <QuickLink
-                  label="Add new student"
-                  to="/students"
-                />
-
-                <QuickLink
-                  label="Mark today's attendance"
-                  to="/attendance"
-                />
-
-                <QuickLink
-                  label="Record fee payment"
-                  to="/fees"
-                />
-
-                <QuickLink
-                  label="Create an exam"
-                  to="/exams"
-                />
-
-                <QuickLink
-                  label="View reports"
-                  to="/reports"
-                />
-
-              </ul>
-
             </div>
+          </>
+        )}
 
-          </div>
-        </>
-      )}
+        {/* Announcement for users who cannot see statistics */}
+        {!canSeeStats && (
+          <CurrentAnnouncement
+            announcement={latestAnnouncement}
+            loading={loading}
+          />
+        )}
 
+      </div>
     </DashboardLayout>
   );
 }
 
 // --------------------------------------------------
-// Academic Information Card
+// CURRENT ANNOUNCEMENT
+// --------------------------------------------------
+
+function CurrentAnnouncement({
+  announcement,
+  loading,
+  large = false,
+}) {
+  return (
+    <div
+      className={`card p-5 ${
+        large ? "lg:col-span-2" : ""
+      }`}
+    >
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+
+        <div className="flex items-center gap-3">
+
+          <div className="w-11 h-11 rounded-xl bg-[#e7f7ea] text-[#2f9e44] flex items-center justify-center shrink-0">
+            <Megaphone size={22} />
+          </div>
+
+          <div>
+            <h3 className="font-bold text-navy-900 text-lg">
+              Current Announcement
+            </h3>
+
+            <p className="text-sm text-navy-900/50">
+              Latest school announcement
+            </p>
+          </div>
+
+        </div>
+
+        <Link
+          to="/announcements"
+          className="text-brand-600 font-semibold text-sm hover:underline flex items-center gap-1 shrink-0"
+        >
+          View All
+          <ArrowRight size={16} />
+        </Link>
+
+      </div>
+
+      {/* Loading */}
+      {loading ? (
+        <div className="text-sm text-navy-900/40 py-6 text-center">
+          Loading announcement...
+        </div>
+      ) : !announcement ? (
+        /* No announcement */
+        <div className="rounded-xl border border-[#eef0f4] p-6 text-center text-sm text-navy-900/40">
+          No current announcements.
+        </div>
+      ) : (
+        /* Latest Announcement */
+        <div className="rounded-xl border border-[#eef0f4] p-5">
+
+          <div className="flex items-start justify-between gap-4">
+
+            <div className="min-w-0">
+
+              {/* Title + Priority */}
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+
+                <h4 className="text-lg font-bold text-navy-900">
+                  {announcement.title}
+                </h4>
+
+                <span
+                  className={`badge ${
+                    announcement.priority === "urgent"
+                      ? "badge-red"
+                      : announcement.priority === "important"
+                      ? "badge-orange"
+                      : "badge-gray"
+                  } capitalize`}
+                >
+                  {announcement.priority}
+                </span>
+
+              </div>
+
+              {/* Message */}
+              <p className="text-sm text-navy-900/70 whitespace-pre-wrap">
+                {announcement.message}
+              </p>
+
+              {/* Date + Audience */}
+              <div className="flex items-center gap-4 mt-4 text-xs text-navy-900/50">
+
+                <span className="flex items-center gap-1">
+                  <Clock size={14} />
+
+                  {new Date(
+                    announcement.created_at
+                  ).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                  })}
+                </span>
+
+                <span className="flex items-center gap-1">
+                  <Users size={14} />
+
+                  {announcement.target_role === "all"
+                    ? "Everyone"
+                    : announcement.target_role}
+                </span>
+
+              </div>
+
+            </div>
+
+            {/* Right Icon */}
+            <div className="w-11 h-11 rounded-xl bg-[#e7f7ea] text-[#2f9e44] flex items-center justify-center shrink-0">
+              <Megaphone size={20} />
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// --------------------------------------------------
+// ACADEMIC INFORMATION CARD
 // --------------------------------------------------
 
 function AcademicInfo({
@@ -492,7 +574,7 @@ function AcademicInfo({
   value,
 }) {
   return (
-    <div className="rounded-xl border border-[#eef0f4] dark:border-[#1e2947] p-4">
+    <div className="rounded-xl border border-[#eef0f4] p-4">
 
       <div className="flex items-center gap-2 mb-2">
 
@@ -516,80 +598,7 @@ function AcademicInfo({
 }
 
 // --------------------------------------------------
-// Announcement Item
-// --------------------------------------------------
-
-function AnnouncementItem({
-  title,
-  description,
-  date,
-  audience,
-  priority,
-}) {
-  const priorityClass = {
-    Normal:
-      "bg-gray-100 text-gray-600 dark:bg-[#1e2947] dark:text-[#9aa4c4]",
-
-    Important:
-      "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300",
-
-    Urgent:
-      "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300",
-  };
-
-  return (
-    <div className="rounded-xl border border-[#eef0f4] dark:border-[#1e2947] p-4 hover:border-brand-500 dark:hover:border-brand-400 transition-colors">
-
-      <div className="flex items-start justify-between gap-3">
-
-        <div className="min-w-0">
-
-          <div className="flex items-center gap-2 flex-wrap">
-
-            <h4 className="font-semibold text-navy-900">
-              {title}
-            </h4>
-
-            <span
-              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${priorityClass[priority]}`}
-            >
-              {priority}
-            </span>
-
-          </div>
-
-          <p className="text-sm text-navy-900/60 mt-1.5 leading-5">
-            {description}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-navy-900/50">
-
-            <span className="flex items-center gap-1">
-              <Clock size={13} />
-              {date}
-            </span>
-
-            <span className="flex items-center gap-1">
-              <Users size={13} />
-              {audience}
-            </span>
-
-          </div>
-
-        </div>
-
-        <div className="shrink-0 w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center">
-          <Megaphone size={15} />
-        </div>
-
-      </div>
-
-    </div>
-  );
-}
-
-// --------------------------------------------------
-// Quick Link
+// QUICK LINK
 // --------------------------------------------------
 
 function QuickLink({ label, to }) {
@@ -597,7 +606,7 @@ function QuickLink({ label, to }) {
     <li>
       <Link
         to={to}
-        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-navy-900/70 hover:bg-[#f7f8fa] dark:hover:bg-[#17203e] hover:text-navy-900 transition-colors"
+        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-navy-900/70 hover:bg-[#f8f9fb] hover:text-brand-600 transition-colors"
       >
         <span>{label}</span>
 
