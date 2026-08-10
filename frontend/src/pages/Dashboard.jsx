@@ -10,17 +10,10 @@ import {
   Building2,
   CalendarDays,
   Layers3,
+  Bell,
+  Megaphone,
+  Clock,
 } from "lucide-react";
-
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  CartesianGrid,
-} from "recharts";
 
 import DashboardLayout from "../components/DashboardLayout";
 import StatCard from "../components/StatCard";
@@ -31,7 +24,6 @@ export default function Dashboard() {
   const { user } = useAuth();
 
   const [stats, setStats] = useState(null);
-  const [trend, setTrend] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const isStudent = user?.role === "student";
@@ -45,31 +37,10 @@ export default function Dashboard() {
   useEffect(() => {
     setLoading(true);
 
-    const requests = [
-      api.get("/dashboard/stats"),
-    ];
-
-    // Attendance chart sirf admin/management/teacher ke liye
-    if (canSeeStats) {
-      requests.push(
-        api.get("/dashboard/attendance-trend")
-      );
-    }
-
-    Promise.all(requests)
-      .then(([statsRes, trendRes]) => {
-        setStats(statsRes.data);
-
-        if (trendRes) {
-          setTrend(
-            trendRes.data.map((d) => ({
-              ...d,
-              day: d.date.slice(5),
-            }))
-          );
-        } else {
-          setTrend([]);
-        }
+    api
+      .get("/dashboard/stats")
+      .then((res) => {
+        setStats(res.data);
       })
       .catch((err) => {
         console.error("Dashboard loading error:", err);
@@ -77,7 +48,7 @@ export default function Dashboard() {
       .finally(() => {
         setLoading(false);
       });
-  }, [user?.role, canSeeStats]);
+  }, [user?.role]);
 
   // --------------------------------------------------
   // STUDENT DASHBOARD
@@ -127,7 +98,9 @@ export default function Dashboard() {
 
                   <div>
                     <h3 className="text-lg font-bold text-navy-900">
-                      {student?.name || user?.name || "Student"}
+                      {student?.name ||
+                        user?.name ||
+                        "Student"}
                     </h3>
 
                     {student?.roll_no && (
@@ -172,14 +145,13 @@ export default function Dashboard() {
                 </div>
 
                 {!academic ? (
-                  <div className="rounded-xl border border-[#eef0f4] p-5 text-sm text-navy-900/50">
+                  <div className="rounded-xl border border-[#eef0f4] dark:border-[#1e2947] p-5 text-sm text-navy-900/50">
                     No class has been assigned to your
                     student profile yet.
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
-                    {/* Course */}
                     <AcademicInfo
                       icon={GraduationCap}
                       label="Course"
@@ -188,7 +160,6 @@ export default function Dashboard() {
                       }
                     />
 
-                    {/* Department */}
                     <AcademicInfo
                       icon={Building2}
                       label="Department"
@@ -197,7 +168,6 @@ export default function Dashboard() {
                       }
                     />
 
-                    {/* Year */}
                     <AcademicInfo
                       icon={Layers3}
                       label="Year"
@@ -206,7 +176,6 @@ export default function Dashboard() {
                       }
                     />
 
-                    {/* Semester */}
                     <AcademicInfo
                       icon={CalendarDays}
                       label="Semester"
@@ -215,7 +184,6 @@ export default function Dashboard() {
                       }
                     />
 
-                    {/* Session */}
                     <AcademicInfo
                       icon={CalendarDays}
                       label="Session"
@@ -224,7 +192,6 @@ export default function Dashboard() {
                       }
                     />
 
-                    {/* Section */}
                     <AcademicInfo
                       icon={Users}
                       label="Section"
@@ -286,8 +253,14 @@ export default function Dashboard() {
         user?.name?.split(" ")[0] || ""
       }`}
     >
+
+      {/* ---------------------------------------------- */}
+      {/* User without dashboard statistics */}
+      {/* ---------------------------------------------- */}
+
       {!canSeeStats && (
-        <div className="card p-6">
+        <div className="card p-5">
+
           <h2 className="text-xl font-bold text-navy-900">
             Dashboard
           </h2>
@@ -307,8 +280,13 @@ export default function Dashboard() {
               </Link>
             </div>
           )}
+
         </div>
       )}
+
+      {/* ---------------------------------------------- */}
+      {/* Admin / Management / Teacher */}
+      {/* ---------------------------------------------- */}
 
       {canSeeStats && (
         <>
@@ -369,59 +347,101 @@ export default function Dashboard() {
               }
               color="red"
             />
+
           </div>
 
-          {/* Attendance + Quick Links */}
+          {/* ------------------------------------------ */}
+          {/* Announcements + Quick Links */}
+          {/* ------------------------------------------ */}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
+            {/* Announcements */}
             <div className="card p-5 lg:col-span-2">
 
-              <h3 className="font-bold text-navy-900 mb-4">
-                Attendance Overview (Last 7 Days)
-              </h3>
+              {/* Header */}
+              <div className="flex items-center justify-between mb-5">
 
-              <ResponsiveContainer
-                width="100%"
-                height={260}
-              >
-                <LineChart data={trend}>
+                <div className="flex items-center gap-3">
 
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#eef0f4"
-                  />
+                  <div className="w-10 h-10 rounded-xl bg-brand-100 text-brand-600 flex items-center justify-center">
+                    <Megaphone size={20} />
+                  </div>
 
-                  <XAxis
-                    dataKey="day"
-                    tick={{ fontSize: 12 }}
-                    stroke="#9aa1af"
-                  />
+                  <div>
+                    <h3 className="font-bold text-navy-900">
+                      Announcements
+                    </h3>
 
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    stroke="#9aa1af"
-                    unit="%"
-                  />
+                    <p className="text-xs text-navy-900/50 mt-0.5">
+                      Latest school announcements
+                    </p>
+                  </div>
 
-                  <Tooltip />
+                </div>
 
-                  <Line
-                    type="monotone"
-                    dataKey="percent"
-                    stroke="#2f9e44"
-                    strokeWidth={2.5}
-                    dot={{ r: 4 }}
-                  />
+                <Link
+                  to="/announcements"
+                  className="text-sm font-semibold text-brand-600 hover:underline"
+                >
+                  View All →
+                </Link>
 
-                </LineChart>
-              </ResponsiveContainer>
+              </div>
+
+              {/* Announcement List */}
+              <div className="space-y-3">
+
+                <AnnouncementItem
+                  title="Semester Examination Schedule Released"
+                  description="The examination schedule for the upcoming semester has been published. Please check the examination section for complete details."
+                  date="Aug 10, 2026"
+                  audience="All"
+                  priority="Important"
+                />
+
+                <AnnouncementItem
+                  title="Independence Day Holiday"
+                  description="The school will remain closed on August 15 due to Independence Day."
+                  date="Aug 09, 2026"
+                  audience="All"
+                  priority="Normal"
+                />
+
+                <AnnouncementItem
+                  title="Faculty Meeting"
+                  description="Monthly faculty meeting will be held at 3:00 PM in the conference room."
+                  date="Aug 08, 2026"
+                  audience="Teachers"
+                  priority="Important"
+                />
+
+                <AnnouncementItem
+                  title="Fee Payment Reminder"
+                  description="Students with pending fees are requested to complete their fee payment before the due date."
+                  date="Aug 07, 2026"
+                  audience="Students"
+                  priority="Urgent"
+                />
+
+              </div>
+
             </div>
 
+            {/* Quick Links */}
             <div className="card p-5">
 
-              <h3 className="font-bold text-navy-900 mb-4">
-                Quick Links
-              </h3>
+              <div className="flex items-center gap-2 mb-4">
+
+                <div className="w-9 h-9 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center">
+                  <Bell size={18} />
+                </div>
+
+                <h3 className="font-bold text-navy-900">
+                  Quick Links
+                </h3>
+
+              </div>
 
               <ul className="space-y-3 text-sm">
 
@@ -451,17 +471,19 @@ export default function Dashboard() {
                 />
 
               </ul>
+
             </div>
 
           </div>
         </>
       )}
+
     </DashboardLayout>
   );
 }
 
 // --------------------------------------------------
-// Academic information card
+// Academic Information Card
 // --------------------------------------------------
 
 function AcademicInfo({
@@ -470,7 +492,7 @@ function AcademicInfo({
   value,
 }) {
   return (
-    <div className="rounded-xl border border-[#eef0f4] p-4">
+    <div className="rounded-xl border border-[#eef0f4] dark:border-[#1e2947] p-4">
 
       <div className="flex items-center gap-2 mb-2">
 
@@ -494,6 +516,79 @@ function AcademicInfo({
 }
 
 // --------------------------------------------------
+// Announcement Item
+// --------------------------------------------------
+
+function AnnouncementItem({
+  title,
+  description,
+  date,
+  audience,
+  priority,
+}) {
+  const priorityClass = {
+    Normal:
+      "bg-gray-100 text-gray-600 dark:bg-[#1e2947] dark:text-[#9aa4c4]",
+
+    Important:
+      "bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300",
+
+    Urgent:
+      "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300",
+  };
+
+  return (
+    <div className="rounded-xl border border-[#eef0f4] dark:border-[#1e2947] p-4 hover:border-brand-500 dark:hover:border-brand-400 transition-colors">
+
+      <div className="flex items-start justify-between gap-3">
+
+        <div className="min-w-0">
+
+          <div className="flex items-center gap-2 flex-wrap">
+
+            <h4 className="font-semibold text-navy-900">
+              {title}
+            </h4>
+
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${priorityClass[priority]}`}
+            >
+              {priority}
+            </span>
+
+          </div>
+
+          <p className="text-sm text-navy-900/60 mt-1.5 leading-5">
+            {description}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-navy-900/50">
+
+            <span className="flex items-center gap-1">
+              <Clock size={13} />
+              {date}
+            </span>
+
+            <span className="flex items-center gap-1">
+              <Users size={13} />
+              {audience}
+            </span>
+
+          </div>
+
+        </div>
+
+        <div className="shrink-0 w-8 h-8 rounded-lg bg-brand-100 text-brand-600 flex items-center justify-center">
+          <Megaphone size={15} />
+        </div>
+
+      </div>
+
+    </div>
+  );
+}
+
+// --------------------------------------------------
 // Quick Link
 // --------------------------------------------------
 
@@ -502,10 +597,13 @@ function QuickLink({ label, to }) {
     <li>
       <Link
         to={to}
-        className="flex items-center justify-between p-2.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/70"
+        className="flex items-center justify-between rounded-lg px-3 py-2.5 text-navy-900/70 hover:bg-[#f7f8fa] dark:hover:bg-[#17203e] hover:text-navy-900 transition-colors"
       >
         <span>{label}</span>
-        <span>→</span>
+
+        <span className="text-brand-600">
+          →
+        </span>
       </Link>
     </li>
   );
