@@ -71,58 +71,120 @@ exports.getTimetable = async (req, res) => {
 
 // ---------------------------------------------------------
 // GET /api/timetable/me
-// Student - ONLY their own class timetable
+// Student / Teacher
+// Student: ONLY their own class timetable
+// Teacher: their own timetable
 // ---------------------------------------------------------
 
 exports.getMyTimetable = async (req, res) => {
   try {
-    const student = await Student.findOne({
-      where: {
-        user_id: req.user.id,
-      },
-    });
+    // -----------------------------------------------------
+    // Student
+    // -----------------------------------------------------
 
-    if (!student) {
-      return res.status(404).json({
-        message: "Student profile not found.",
+    if (req.user.role === "student") {
+      const student = await Student.findOne({
+        where: {
+          user_id: req.user.id,
+        },
       });
+
+      if (!student) {
+        return res.status(404).json({
+          message: "Student profile not found.",
+        });
+      }
+
+      if (!student.class_id) {
+        return res.json([]);
+      }
+
+      const slots = await TimetableSlot.findAll({
+        where: {
+          class_id: student.class_id,
+        },
+        include: [
+          {
+            model: SchoolClass,
+            attributes: [
+              "id",
+              "course_name",
+              "course_code",
+              "department_name",
+              "department_code",
+              "year",
+              "semester",
+              "session",
+              "section",
+            ],
+          },
+          {
+            model: Teacher,
+            attributes: ["id", "name"],
+          },
+        ],
+        order: [
+          ["day", "ASC"],
+          ["start_time", "ASC"],
+        ],
+      });
+
+      return res.json(slots);
     }
 
-    if (!student.class_id) {
-      return res.json([]);
+    // -----------------------------------------------------
+    // Teacher
+    // -----------------------------------------------------
+
+    if (req.user.role === "teacher") {
+      const teacher = await Teacher.findOne({
+        where: {
+          user_id: req.user.id,
+        },
+      });
+
+      if (!teacher) {
+        return res.status(404).json({
+          message: "Teacher profile not found.",
+        });
+      }
+
+      const slots = await TimetableSlot.findAll({
+        where: {
+          teacher_id: teacher.id,
+        },
+        include: [
+          {
+            model: SchoolClass,
+            attributes: [
+              "id",
+              "course_name",
+              "course_code",
+              "department_name",
+              "department_code",
+              "year",
+              "semester",
+              "session",
+              "section",
+            ],
+          },
+          {
+            model: Teacher,
+            attributes: ["id", "name"],
+          },
+        ],
+        order: [
+          ["day", "ASC"],
+          ["start_time", "ASC"],
+        ],
+      });
+
+      return res.json(slots);
     }
 
-    const slots = await TimetableSlot.findAll({
-      where: {
-        class_id: student.class_id,
-      },
-      include: [
-        {
-          model: SchoolClass,
-          attributes: [
-            "id",
-            "course_name",
-            "course_code",
-            "department_name",
-            "department_code",
-            "year",
-            "semester",
-            "session",
-            "section",
-          ],
-        },
-        {
-          model: Teacher,
-          attributes: ["id", "name"],
-        },
-      ],
-      order: [
-        ["day", "ASC"],
-        ["start_time", "ASC"],
-      ],
+    return res.status(403).json({
+      message: "Access denied.",
     });
-
-    res.json(slots);
   } catch (err) {
     console.error("getMyTimetable:", err);
 
