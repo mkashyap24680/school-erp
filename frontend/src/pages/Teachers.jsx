@@ -11,6 +11,7 @@ const emptyForm = {
   name: "",
   employee_id: "",
   email: "",
+  password: "",
   phone: "",
   subject: "",
   department: "",
@@ -25,11 +26,6 @@ const emptyForm = {
   address: "",
   emergency_contact_name: "",
   emergency_contact_number: "",
-
-  // Login account
-  login_email: "",
-  password: "",
-  confirm_password: "",
 };
 
 export default function Teachers() {
@@ -48,6 +44,7 @@ export default function Teachers() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Filters
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("");
@@ -83,7 +80,9 @@ export default function Teachers() {
   const departments = useMemo(() => {
     return [
       ...new Set(
-        teachers.map((t) => t.department).filter(Boolean)
+        teachers
+          .map((teacher) => teacher.department)
+          .filter(Boolean)
       ),
     ].sort();
   }, [teachers]);
@@ -91,7 +90,9 @@ export default function Teachers() {
   const subjects = useMemo(() => {
     return [
       ...new Set(
-        teachers.map((t) => t.subject).filter(Boolean)
+        teachers
+          .map((teacher) => teacher.subject)
+          .filter(Boolean)
       ),
     ].sort();
   }, [teachers]);
@@ -99,13 +100,15 @@ export default function Teachers() {
   const courses = useMemo(() => {
     return [
       ...new Set(
-        teachers.map((t) => t.course).filter(Boolean)
+        teachers
+          .map((teacher) => teacher.course)
+          .filter(Boolean)
       ),
     ].sort();
   }, [teachers]);
 
   // -----------------------------------------
-  // Filters
+  // Apply filters
   // -----------------------------------------
 
   const filteredTeachers = useMemo(() => {
@@ -174,6 +177,11 @@ export default function Teachers() {
       name: teacher.name || "",
       employee_id: teacher.employee_id || "",
       email: teacher.email || "",
+
+      // IMPORTANT:
+      // Never load/display the existing password.
+      password: "",
+
       phone: teacher.phone || "",
       subject: teacher.subject || "",
       department: teacher.department || "",
@@ -190,11 +198,6 @@ export default function Teachers() {
         teacher.emergency_contact_name || "",
       emergency_contact_number:
         teacher.emergency_contact_number || "",
-
-      // Login account
-      login_email: teacher.User?.email || teacher.user?.email || teacher.email || "",
-      password: "",
-      confirm_password: "",
     });
 
     setError("");
@@ -225,87 +228,61 @@ export default function Teachers() {
     setError("");
 
     try {
-      // -----------------------------
-      // Validation
-      // -----------------------------
+      const cleanPassword = form.password.trim();
 
-      if (!editingId) {
-        if (!form.login_email.trim()) {
-          setError("Login email is required.");
-          setSaving(false);
-          return;
-        }
-
-        if (!form.password) {
-          setError("Password is required for a new teacher.");
-          setSaving(false);
-          return;
-        }
-
-        if (form.password.length < 6) {
-          setError("Password must be at least 6 characters.");
-          setSaving(false);
-          return;
-        }
-
-        if (form.password !== form.confirm_password) {
-          setError("Password and confirm password do not match.");
-          setSaving(false);
-          return;
-        }
-      }
-
-      if (
-        editingId &&
-        form.password &&
-        form.password !== form.confirm_password
-      ) {
-        setError("Password and confirm password do not match.");
+      // Password is required only when creating
+      if (!editingId && cleanPassword.length < 6) {
+        setError(
+          "Password is required and must be at least 6 characters."
+        );
         setSaving(false);
         return;
       }
 
-      // -----------------------------
-      // Teacher payload
-      // -----------------------------
+      // When editing:
+      // password can remain blank.
+      // Backend will keep the current password.
+      if (editingId && cleanPassword && cleanPassword.length < 6) {
+        setError(
+          "New password must be at least 6 characters."
+        );
+        setSaving(false);
+        return;
+      }
 
       const payload = {
+        ...form,
+
         name: form.name.trim(),
         employee_id: form.employee_id.trim(),
-        email: form.email.trim(),
+        email: form.email.trim().toLowerCase(),
+
+        // Keep password:
+        // - required for create
+        // - blank means no password change during edit
+        password: cleanPassword,
+
         phone: form.phone.trim(),
         subject: form.subject.trim(),
         department: form.department.trim(),
         course: form.course.trim(),
         designation: form.designation.trim(),
         qualification: form.qualification.trim(),
-        joining_date: form.joining_date || null,
         experience: form.experience.trim(),
         employment_type: form.employment_type.trim(),
         campus: form.campus.trim(),
-        status: form.status,
         address: form.address.trim(),
         emergency_contact_name:
           form.emergency_contact_name.trim(),
         emergency_contact_number:
           form.emergency_contact_number.trim(),
-
-        // Login account data
-        login_email: form.login_email.trim(),
       };
 
-      // Only send password when creating
-      // or when user entered a new password while editing.
-      if (form.password) {
-        payload.password = form.password;
-      }
-
-      // -----------------------------
-      // Create / Update
-      // -----------------------------
-
       if (editingId) {
-        await api.put(`/teachers/${editingId}`, payload);
+        await api.put(
+          `/teachers/${editingId}`,
+          payload
+        );
       } else {
         await api.post("/teachers", payload);
       }
@@ -320,7 +297,6 @@ export default function Teachers() {
 
       setError(
         err.response?.data?.message ||
-          err.response?.data?.error ||
           "Failed to save teacher."
       );
     } finally {
@@ -335,7 +311,7 @@ export default function Teachers() {
   const handleDelete = async (id) => {
     if (
       !window.confirm(
-        "Delete this teacher record? This cannot be undone."
+        "Delete this teacher record and login account? This cannot be undone."
       )
     ) {
       return;
@@ -389,6 +365,7 @@ export default function Teachers() {
                   { key: "name", label: "name" },
                   { key: "employee_id", label: "employee_id" },
                   { key: "email", label: "email" },
+                  { key: "password", label: "password" },
                   { key: "phone", label: "phone" },
                   { key: "subject", label: "subject" },
                   { key: "department", label: "department" },
@@ -400,6 +377,15 @@ export default function Teachers() {
                   { key: "employment_type", label: "employment_type" },
                   { key: "campus", label: "campus" },
                   { key: "status", label: "status" },
+                  { key: "address", label: "address" },
+                  {
+                    key: "emergency_contact_name",
+                    label: "emergency_contact_name",
+                  },
+                  {
+                    key: "emergency_contact_number",
+                    label: "emergency_contact_number",
+                  },
                 ]}
                 onDone={load}
               />
@@ -417,10 +403,13 @@ export default function Teachers() {
           </div>
         </div>
 
-        {/* Filters */}
+        {/* Quick Filters */}
         <div className="card p-4">
           <div className="flex items-center gap-2 mb-4">
-            <Search size={17} className="text-navy-900/50" />
+            <Search
+              size={17}
+              className="text-navy-900/50"
+            />
 
             <h2 className="font-semibold text-navy-900">
               Quick Filters
@@ -429,14 +418,20 @@ export default function Teachers() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
 
-            <input
-              type="text"
-              placeholder="Search Teacher..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="form-input"
-            />
+            {/* Search */}
+            <div className="lg:col-span-1">
+              <input
+                type="text"
+                placeholder="Search Teacher..."
+                value={search}
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+                className="form-input"
+              />
+            </div>
 
+            {/* Department */}
             <select
               value={departmentFilter}
               onChange={(e) =>
@@ -444,7 +439,9 @@ export default function Teachers() {
               }
               className="form-input"
             >
-              <option value="">All Departments</option>
+              <option value="">
+                All Departments
+              </option>
 
               {departments.map((department) => (
                 <option
@@ -456,6 +453,7 @@ export default function Teachers() {
               ))}
             </select>
 
+            {/* Subject */}
             <select
               value={subjectFilter}
               onChange={(e) =>
@@ -463,15 +461,21 @@ export default function Teachers() {
               }
               className="form-input"
             >
-              <option value="">All Subjects</option>
+              <option value="">
+                All Subjects
+              </option>
 
               {subjects.map((subject) => (
-                <option key={subject} value={subject}>
+                <option
+                  key={subject}
+                  value={subject}
+                >
                   {subject}
                 </option>
               ))}
             </select>
 
+            {/* Course */}
             <select
               value={courseFilter}
               onChange={(e) =>
@@ -479,15 +483,21 @@ export default function Teachers() {
               }
               className="form-input"
             >
-              <option value="">All Courses</option>
+              <option value="">
+                All Courses
+              </option>
 
               {courses.map((course) => (
-                <option key={course} value={course}>
+                <option
+                  key={course}
+                  value={course}
+                >
                   {course}
                 </option>
               ))}
             </select>
 
+            {/* Status */}
             <select
               value={statusFilter}
               onChange={(e) =>
@@ -495,9 +505,17 @@ export default function Teachers() {
               }
               className="form-input"
             >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="">
+                All Status
+              </option>
+
+              <option value="active">
+                Active
+              </option>
+
+              <option value="inactive">
+                Inactive
+              </option>
             </select>
           </div>
 
@@ -540,19 +558,53 @@ export default function Teachers() {
         ) : (
           <div className="card overflow-x-auto">
             <table className="w-full text-sm">
+
               <thead>
                 <tr className="border-b border-navy-900/10 text-left">
-                  <th className="px-4 py-4 font-semibold">Profile</th>
-                  <th className="px-4 py-4 font-semibold">Employee ID</th>
-                  <th className="px-4 py-4 font-semibold">Department</th>
-                  <th className="px-4 py-4 font-semibold">Designation</th>
-                  <th className="px-4 py-4 font-semibold">Experience</th>
-                  <th className="px-4 py-4 font-semibold">Employment</th>
-                  <th className="px-4 py-4 font-semibold">Campus</th>
-                  <th className="px-4 py-4 font-semibold">Contact</th>
-                  <th className="px-4 py-4 font-semibold">Status</th>
-                  <th className="px-4 py-4 font-semibold">Joining Date</th>
-                  <th className="px-4 py-4 font-semibold">Actions</th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Profile
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Employee ID
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Department
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Designation
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Experience
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Employment
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Campus
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Contact
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Status
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Joining Date
+                  </th>
+
+                  <th className="px-4 py-4 font-semibold">
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
@@ -562,52 +614,70 @@ export default function Teachers() {
                     key={teacher.id}
                     className="border-b border-navy-900/5 hover:bg-[#f8f9fb]"
                   >
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-navy-900">
-                        {teacher.name || "—"}
-                      </div>
 
-                      <div className="text-xs text-navy-900/50 mt-1">
-                        {teacher.subject || "No subject"}
+                    {/* Profile */}
+                    <td className="px-4 py-4">
+                      <div>
+                        <div className="font-semibold text-navy-900">
+                          {teacher.name || "—"}
+                        </div>
+
+                        <div className="text-xs text-navy-900/50 mt-1">
+                          {teacher.subject ||
+                            "No subject"}
+                        </div>
                       </div>
                     </td>
 
+                    {/* Employee ID */}
                     <td className="px-4 py-4">
                       {teacher.employee_id || "—"}
                     </td>
 
+                    {/* Department */}
                     <td className="px-4 py-4">
                       {teacher.department || "—"}
                     </td>
 
+                    {/* Designation */}
                     <td className="px-4 py-4">
                       {teacher.designation || "—"}
                     </td>
 
+                    {/* Experience */}
                     <td className="px-4 py-4">
-                      {teacher.experience || "—"}
+                      {teacher.experience
+                        ? teacher.experience
+                        : "—"}
                     </td>
 
+                    {/* Employment */}
                     <td className="px-4 py-4">
                       {teacher.employment_type || "—"}
                     </td>
 
+                    {/* Campus */}
                     <td className="px-4 py-4">
                       {teacher.campus || "—"}
                     </td>
 
+                    {/* Contact */}
                     <td className="px-4 py-4">
                       <div>
-                        {teacher.phone || "—"}
-                      </div>
+                        <div>
+                          {teacher.phone || "—"}
+                        </div>
 
-                      <div className="text-xs text-navy-900/50 mt-1">
-                        {teacher.email || "—"}
+                        <div className="text-xs text-navy-900/50 mt-1">
+                          {teacher.email || "—"}
+                        </div>
                       </div>
                     </td>
 
+                    {/* Status */}
                     <td className="px-4 py-4">
-                      {teacher.status === "inactive" ? (
+                      {teacher.status ===
+                      "inactive" ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600">
                           <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
                           Inactive
@@ -620,10 +690,12 @@ export default function Teachers() {
                       )}
                     </td>
 
+                    {/* Joining Date */}
                     <td className="px-4 py-4">
                       {teacher.joining_date || "—"}
                     </td>
 
+                    {/* Actions */}
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-1">
 
@@ -634,7 +706,9 @@ export default function Teachers() {
 
                         {canEdit && (
                           <button
-                            onClick={() => openEdit(teacher)}
+                            onClick={() =>
+                              openEdit(teacher)
+                            }
                             className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
                             title="Edit"
                           >
@@ -645,7 +719,9 @@ export default function Teachers() {
                         {canDelete && (
                           <button
                             onClick={() =>
-                              handleDelete(teacher.id)
+                              handleDelete(
+                                teacher.id
+                              )
                             }
                             className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
                             title="Delete"
@@ -662,120 +738,29 @@ export default function Teachers() {
           </div>
         )}
 
-        {/* Add / Edit Modal */}
+        {/* Add/Edit Teacher Modal */}
         <Modal
           open={modalOpen}
           onClose={() => setModalOpen(false)}
-          title={editingId ? "Edit Teacher" : "Add Teacher"}
+          title={
+            editingId
+              ? "Edit Teacher"
+              : "Add Teacher"
+          }
           wide
         >
           <form
             onSubmit={handleSubmit}
             className="space-y-5"
           >
+
             {error && (
               <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">
                 {error}
               </div>
             )}
 
-            {/* ========================= */}
-            {/* LOGIN ACCOUNT */}
-            {/* ========================= */}
-
-            <div className="rounded-xl border border-navy-900/10 p-4 bg-gray-50">
-              <h3 className="font-semibold text-navy-900 mb-1">
-                Login Account
-              </h3>
-
-              <p className="text-xs text-navy-900/50 mb-4">
-                {editingId
-                  ? "Leave password blank if you do not want to change it."
-                  : "Create login credentials for this teacher."}
-              </p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-                {/* Login Email */}
-                <div>
-                  <label className="form-label">
-                    Login Email
-                  </label>
-
-                  <input
-                    type="email"
-                    name="login_email"
-                    value={form.login_email}
-                    onChange={handleChange}
-                    className="form-input"
-                    placeholder="teacher@example.com"
-                    required={!editingId}
-                  />
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="form-label">
-                    {editingId
-                      ? "New Password (optional)"
-                      : "Password"}
-                  </label>
-
-                  <input
-                    type="password"
-                    name="password"
-                    value={form.password}
-                    onChange={handleChange}
-                    className="form-input"
-                    placeholder={
-                      editingId
-                        ? "Leave blank to keep current"
-                        : "Minimum 6 characters"
-                    }
-                    required={!editingId}
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
-                </div>
-
-                {/* Confirm Password */}
-                <div>
-                  <label className="form-label">
-                    Confirm Password
-                  </label>
-
-                  <input
-                    type="password"
-                    name="confirm_password"
-                    value={form.confirm_password}
-                    onChange={handleChange}
-                    className="form-input"
-                    placeholder="Re-enter password"
-                    required={!editingId && !!form.password}
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
-                </div>
-
-                {/* Role */}
-                <div>
-                  <label className="form-label">
-                    Account Role
-                  </label>
-
-                  <input
-                    value="Teacher"
-                    disabled
-                    className="form-input bg-gray-100"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* ========================= */}
-            {/* PERSONAL INFORMATION */}
-            {/* ========================= */}
-
+            {/* Personal Information */}
             <div>
               <h3 className="font-semibold text-navy-900 mb-3">
                 Personal Information
@@ -783,6 +768,7 @@ export default function Teachers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
+                {/* Full Name */}
                 <div>
                   <label className="form-label">
                     Full name
@@ -798,6 +784,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Employee ID */}
                 <div>
                   <label className="form-label">
                     Employee ID
@@ -812,6 +799,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Email */}
                 <div>
                   <label className="form-label">
                     Email
@@ -820,6 +808,7 @@ export default function Teachers() {
                   <input
                     type="email"
                     name="email"
+                    required
                     value={form.email}
                     onChange={handleChange}
                     className="form-input"
@@ -827,6 +816,44 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Password */}
+                <div>
+                  <label className="form-label">
+                    {editingId
+                      ? "New password (leave blank to keep current)"
+                      : "Password"}
+                  </label>
+
+                  <input
+                    type="password"
+                    name="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    className="form-input"
+                    placeholder={
+                      editingId
+                        ? "Leave blank to keep current password"
+                        : "Enter password (minimum 6 characters)"
+                    }
+                    minLength={6}
+                    required={!editingId}
+                    autoComplete="new-password"
+                  />
+
+                  {editingId ? (
+                    <p className="text-xs text-navy-900/50 mt-1">
+                      Leave this blank if you do not want
+                      to change the current password.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-navy-900/50 mt-1">
+                      Password must be at least 6
+                      characters.
+                    </p>
+                  )}
+                </div>
+
+                {/* Phone */}
                 <div>
                   <label className="form-label">
                     Phone
@@ -841,6 +868,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Emergency Contact Name */}
                 <div>
                   <label className="form-label">
                     Emergency Contact Name
@@ -848,12 +876,15 @@ export default function Teachers() {
 
                   <input
                     name="emergency_contact_name"
-                    value={form.emergency_contact_name}
+                    value={
+                      form.emergency_contact_name
+                    }
                     onChange={handleChange}
                     className="form-input"
                   />
                 </div>
 
+                {/* Emergency Contact Number */}
                 <div>
                   <label className="form-label">
                     Emergency Contact Number
@@ -861,12 +892,15 @@ export default function Teachers() {
 
                   <input
                     name="emergency_contact_number"
-                    value={form.emergency_contact_number}
+                    value={
+                      form.emergency_contact_number
+                    }
                     onChange={handleChange}
                     className="form-input"
                   />
                 </div>
 
+                {/* Address */}
                 <div className="sm:col-span-2">
                   <label className="form-label">
                     Address
@@ -883,10 +917,7 @@ export default function Teachers() {
               </div>
             </div>
 
-            {/* ========================= */}
-            {/* PROFESSIONAL INFORMATION */}
-            {/* ========================= */}
-
+            {/* Professional Information */}
             <div>
               <h3 className="font-semibold text-navy-900 mb-3">
                 Professional Information
@@ -894,6 +925,7 @@ export default function Teachers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
+                {/* Department */}
                 <div>
                   <label className="form-label">
                     Department
@@ -908,6 +940,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Subject */}
                 <div>
                   <label className="form-label">
                     Subject
@@ -922,6 +955,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Course */}
                 <div>
                   <label className="form-label">
                     Course
@@ -936,6 +970,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Designation */}
                 <div>
                   <label className="form-label">
                     Designation
@@ -950,6 +985,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Qualification */}
                 <div>
                   <label className="form-label">
                     Qualification
@@ -964,6 +1000,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Experience */}
                 <div>
                   <label className="form-label">
                     Experience
@@ -978,6 +1015,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Joining Date */}
                 <div>
                   <label className="form-label">
                     Joining date
@@ -992,6 +1030,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Employment Type */}
                 <div>
                   <label className="form-label">
                     Employment Type
@@ -1006,21 +1045,26 @@ export default function Teachers() {
                     <option value="">
                       Select employment type
                     </option>
+
                     <option value="Permanent">
                       Permanent
                     </option>
+
                     <option value="Contract">
                       Contract
                     </option>
+
                     <option value="Part Time">
                       Part Time
                     </option>
+
                     <option value="Visiting">
                       Visiting
                     </option>
                   </select>
                 </div>
 
+                {/* Campus */}
                 <div>
                   <label className="form-label">
                     Campus / Branch
@@ -1035,6 +1079,7 @@ export default function Teachers() {
                   />
                 </div>
 
+                {/* Status */}
                 <div>
                   <label className="form-label">
                     Status
@@ -1063,7 +1108,10 @@ export default function Teachers() {
 
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setError("");
+                }}
                 className="btn-outline"
               >
                 Cancel
@@ -1078,7 +1126,7 @@ export default function Teachers() {
                   ? "Saving..."
                   : editingId
                   ? "Update Teacher"
-                  : "Create Teacher & Login"}
+                  : "Save Teacher"}
               </button>
 
             </div>
