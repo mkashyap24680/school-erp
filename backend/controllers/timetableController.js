@@ -1,10 +1,6 @@
 const {
   Student,
   SchoolClass,
-  User,
-  Attendance,
-  Fee,
-  Result,
 } = require("../models");
 
 const { logAction } = require("../utils/audit");
@@ -124,7 +120,7 @@ exports.getMyStudentProfile = async (req, res) => {
 
 // ---------------------------------------------------------
 // GET /api/students/me/dashboard
-// Student - ONLY their own data
+// Student - ONLY their own basic data
 // ---------------------------------------------------------
 
 exports.getMyStudentDashboard = async (req, res) => {
