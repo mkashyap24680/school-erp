@@ -60,7 +60,10 @@ export default function Teachers() {
 
     try {
       const res = await api.get("/teachers");
-      setTeachers(Array.isArray(res.data) ? res.data : []);
+
+      setTeachers(
+        Array.isArray(res.data) ? res.data : []
+      );
     } catch (err) {
       console.error("Failed to load teachers:", err);
       setTeachers([]);
@@ -118,9 +121,15 @@ export default function Teachers() {
       const matchesSearch =
         !searchText ||
         teacher.name?.toLowerCase().includes(searchText) ||
-        teacher.employee_id?.toLowerCase().includes(searchText) ||
-        teacher.email?.toLowerCase().includes(searchText) ||
-        teacher.phone?.toLowerCase().includes(searchText);
+        teacher.employee_id
+          ?.toLowerCase()
+          .includes(searchText) ||
+        teacher.email
+          ?.toLowerCase()
+          .includes(searchText) ||
+        teacher.phone
+          ?.toLowerCase()
+          .includes(searchText);
 
       const matchesDepartment =
         !departmentFilter ||
@@ -156,7 +165,7 @@ export default function Teachers() {
   ]);
 
   // -----------------------------------------
-  // Create
+  // Create teacher
   // -----------------------------------------
 
   const openCreate = () => {
@@ -167,7 +176,7 @@ export default function Teachers() {
   };
 
   // -----------------------------------------
-  // Edit
+  // Edit teacher
   // -----------------------------------------
 
   const openEdit = (teacher) => {
@@ -179,7 +188,8 @@ export default function Teachers() {
       email: teacher.email || "",
 
       // IMPORTANT:
-      // Never load/display the existing password.
+      // Never load the existing password from backend.
+      // Leave blank so old password remains unchanged.
       password: "",
 
       phone: teacher.phone || "",
@@ -218,7 +228,7 @@ export default function Teachers() {
   };
 
   // -----------------------------------------
-  // Save
+  // Save teacher
   // -----------------------------------------
 
   const handleSubmit = async (e) => {
@@ -228,21 +238,23 @@ export default function Teachers() {
     setError("");
 
     try {
-      const cleanPassword = form.password.trim();
+      const trimmedPassword = form.password.trim();
 
-      // Password is required only when creating
-      if (!editingId && cleanPassword.length < 6) {
+      // Password required only while creating
+      if (!editingId && trimmedPassword.length < 6) {
         setError(
-          "Password is required and must be at least 6 characters."
+          "Password must be at least 6 characters."
         );
         setSaving(false);
         return;
       }
 
-      // When editing:
-      // password can remain blank.
-      // Backend will keep the current password.
-      if (editingId && cleanPassword && cleanPassword.length < 6) {
+      // Password optional while editing
+      if (
+        editingId &&
+        trimmedPassword &&
+        trimmedPassword.length < 6
+      ) {
         setError(
           "New password must be at least 6 characters."
         );
@@ -251,26 +263,20 @@ export default function Teachers() {
       }
 
       const payload = {
-        ...form,
-
         name: form.name.trim(),
         employee_id: form.employee_id.trim(),
-        email: form.email.trim().toLowerCase(),
-
-        // Keep password:
-        // - required for create
-        // - blank means no password change during edit
-        password: cleanPassword,
-
+        email: form.email.trim(),
         phone: form.phone.trim(),
         subject: form.subject.trim(),
         department: form.department.trim(),
         course: form.course.trim(),
         designation: form.designation.trim(),
         qualification: form.qualification.trim(),
+        joining_date: form.joining_date || null,
         experience: form.experience.trim(),
         employment_type: form.employment_type.trim(),
         campus: form.campus.trim(),
+        status: form.status,
         address: form.address.trim(),
         emergency_contact_name:
           form.emergency_contact_name.trim(),
@@ -278,13 +284,42 @@ export default function Teachers() {
           form.emergency_contact_number.trim(),
       };
 
+      // -----------------------------------------
+      // Password handling
+      // -----------------------------------------
+
+      if (!editingId) {
+        // Required when creating
+        payload.password = trimmedPassword;
+      } else if (trimmedPassword) {
+        // Only send when user wants to change password
+        payload.password = trimmedPassword;
+      }
+
+      // -----------------------------------------
+      // Create / Update
+      // -----------------------------------------
+
       if (editingId) {
-        await api.put(
+        const res = await api.put(
           `/teachers/${editingId}`,
           payload
         );
+
+        console.log(
+          "Teacher updated:",
+          res.data
+        );
       } else {
-        await api.post("/teachers", payload);
+        const res = await api.post(
+          "/teachers",
+          payload
+        );
+
+        console.log(
+          "Teacher created:",
+          res.data
+        );
       }
 
       setModalOpen(false);
@@ -293,7 +328,10 @@ export default function Teachers() {
 
       await load();
     } catch (err) {
-      console.error("Save teacher error:", err);
+      console.error(
+        "Save teacher error:",
+        err
+      );
 
       setError(
         err.response?.data?.message ||
@@ -305,13 +343,13 @@ export default function Teachers() {
   };
 
   // -----------------------------------------
-  // Delete
+  // Delete teacher
   // -----------------------------------------
 
   const handleDelete = async (id) => {
     if (
       !window.confirm(
-        "Delete this teacher record and login account? This cannot be undone."
+        "Delete this teacher record? This will also delete the teacher login account. This cannot be undone."
       )
     ) {
       return;
@@ -321,6 +359,11 @@ export default function Teachers() {
       await api.delete(`/teachers/${id}`);
       await load();
     } catch (err) {
+      console.error(
+        "Delete teacher error:",
+        err
+      );
+
       alert(
         err.response?.data?.message ||
           "Failed to delete teacher."
@@ -338,6 +381,19 @@ export default function Teachers() {
     setSubjectFilter("");
     setCourseFilter("");
     setStatusFilter("");
+  };
+
+  // -----------------------------------------
+  // Close modal
+  // -----------------------------------------
+
+  const closeModal = () => {
+    if (saving) return;
+
+    setModalOpen(false);
+    setEditingId(null);
+    setForm({ ...emptyForm });
+    setError("");
   };
 
   return (
@@ -363,29 +419,41 @@ export default function Teachers() {
                 payloadKey="teachers"
                 expectedColumns={[
                   { key: "name", label: "name" },
-                  { key: "employee_id", label: "employee_id" },
+                  {
+                    key: "employee_id",
+                    label: "employee_id",
+                  },
                   { key: "email", label: "email" },
                   { key: "password", label: "password" },
                   { key: "phone", label: "phone" },
                   { key: "subject", label: "subject" },
-                  { key: "department", label: "department" },
+                  {
+                    key: "department",
+                    label: "department",
+                  },
                   { key: "course", label: "course" },
-                  { key: "designation", label: "designation" },
-                  { key: "qualification", label: "qualification" },
-                  { key: "joining_date", label: "joining_date" },
-                  { key: "experience", label: "experience" },
-                  { key: "employment_type", label: "employment_type" },
+                  {
+                    key: "designation",
+                    label: "designation",
+                  },
+                  {
+                    key: "qualification",
+                    label: "qualification",
+                  },
+                  {
+                    key: "joining_date",
+                    label: "joining_date",
+                  },
+                  {
+                    key: "experience",
+                    label: "experience",
+                  },
+                  {
+                    key: "employment_type",
+                    label: "employment_type",
+                  },
                   { key: "campus", label: "campus" },
                   { key: "status", label: "status" },
-                  { key: "address", label: "address" },
-                  {
-                    key: "emergency_contact_name",
-                    label: "emergency_contact_name",
-                  },
-                  {
-                    key: "emergency_contact_number",
-                    label: "emergency_contact_number",
-                  },
                 ]}
                 onDone={load}
               />
@@ -419,7 +487,7 @@ export default function Teachers() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
 
             {/* Search */}
-            <div className="lg:col-span-1">
+            <div>
               <input
                 type="text"
                 placeholder="Search Teacher..."
@@ -435,7 +503,9 @@ export default function Teachers() {
             <select
               value={departmentFilter}
               onChange={(e) =>
-                setDepartmentFilter(e.target.value)
+                setDepartmentFilter(
+                  e.target.value
+                )
               }
               className="form-input"
             >
@@ -443,21 +513,25 @@ export default function Teachers() {
                 All Departments
               </option>
 
-              {departments.map((department) => (
-                <option
-                  key={department}
-                  value={department}
-                >
-                  {department}
-                </option>
-              ))}
+              {departments.map(
+                (department) => (
+                  <option
+                    key={department}
+                    value={department}
+                  >
+                    {department}
+                  </option>
+                )
+              )}
             </select>
 
             {/* Subject */}
             <select
               value={subjectFilter}
               onChange={(e) =>
-                setSubjectFilter(e.target.value)
+                setSubjectFilter(
+                  e.target.value
+                )
               }
               className="form-input"
             >
@@ -479,7 +553,9 @@ export default function Teachers() {
             <select
               value={courseFilter}
               onChange={(e) =>
-                setCourseFilter(e.target.value)
+                setCourseFilter(
+                  e.target.value
+                )
               }
               className="form-input"
             >
@@ -501,7 +577,9 @@ export default function Teachers() {
             <select
               value={statusFilter}
               onChange={(e) =>
-                setStatusFilter(e.target.value)
+                setStatusFilter(
+                  e.target.value
+                )
               }
               className="form-input"
             >
@@ -605,143 +683,162 @@ export default function Teachers() {
                   <th className="px-4 py-4 font-semibold">
                     Actions
                   </th>
+
                 </tr>
               </thead>
 
               <tbody>
-                {filteredTeachers.map((teacher) => (
-                  <tr
-                    key={teacher.id}
-                    className="border-b border-navy-900/5 hover:bg-[#f8f9fb]"
-                  >
+                {filteredTeachers.map(
+                  (teacher) => (
+                    <tr
+                      key={teacher.id}
+                      className="border-b border-navy-900/5 hover:bg-[#f8f9fb]"
+                    >
 
-                    {/* Profile */}
-                    <td className="px-4 py-4">
-                      <div>
-                        <div className="font-semibold text-navy-900">
-                          {teacher.name || "—"}
-                        </div>
-
-                        <div className="text-xs text-navy-900/50 mt-1">
-                          {teacher.subject ||
-                            "No subject"}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Employee ID */}
-                    <td className="px-4 py-4">
-                      {teacher.employee_id || "—"}
-                    </td>
-
-                    {/* Department */}
-                    <td className="px-4 py-4">
-                      {teacher.department || "—"}
-                    </td>
-
-                    {/* Designation */}
-                    <td className="px-4 py-4">
-                      {teacher.designation || "—"}
-                    </td>
-
-                    {/* Experience */}
-                    <td className="px-4 py-4">
-                      {teacher.experience
-                        ? teacher.experience
-                        : "—"}
-                    </td>
-
-                    {/* Employment */}
-                    <td className="px-4 py-4">
-                      {teacher.employment_type || "—"}
-                    </td>
-
-                    {/* Campus */}
-                    <td className="px-4 py-4">
-                      {teacher.campus || "—"}
-                    </td>
-
-                    {/* Contact */}
-                    <td className="px-4 py-4">
-                      <div>
+                      {/* Profile */}
+                      <td className="px-4 py-4">
                         <div>
-                          {teacher.phone || "—"}
+                          <div className="font-semibold text-navy-900">
+                            {teacher.name ||
+                              "—"}
+                          </div>
+
+                          <div className="text-xs text-navy-900/50 mt-1">
+                            {teacher.subject ||
+                              "No subject"}
+                          </div>
                         </div>
+                      </td>
 
-                        <div className="text-xs text-navy-900/50 mt-1">
-                          {teacher.email || "—"}
+                      {/* Employee ID */}
+                      <td className="px-4 py-4">
+                        {teacher.employee_id ||
+                          "—"}
+                      </td>
+
+                      {/* Department */}
+                      <td className="px-4 py-4">
+                        {teacher.department ||
+                          "—"}
+                      </td>
+
+                      {/* Designation */}
+                      <td className="px-4 py-4">
+                        {teacher.designation ||
+                          "—"}
+                      </td>
+
+                      {/* Experience */}
+                      <td className="px-4 py-4">
+                        {teacher.experience ||
+                          "—"}
+                      </td>
+
+                      {/* Employment */}
+                      <td className="px-4 py-4">
+                        {teacher.employment_type ||
+                          "—"}
+                      </td>
+
+                      {/* Campus */}
+                      <td className="px-4 py-4">
+                        {teacher.campus ||
+                          "—"}
+                      </td>
+
+                      {/* Contact */}
+                      <td className="px-4 py-4">
+                        <div>
+                          <div>
+                            {teacher.phone ||
+                              "—"}
+                          </div>
+
+                          <div className="text-xs text-navy-900/50 mt-1">
+                            {teacher.email ||
+                              "—"}
+                          </div>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    {/* Status */}
-                    <td className="px-4 py-4">
-                      {teacher.status ===
-                      "inactive" ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                          Inactive
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                          Active
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Joining Date */}
-                    <td className="px-4 py-4">
-                      {teacher.joining_date || "—"}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1">
-
-                        <IdCardButton
-                          person={teacher}
-                          type="Teacher"
-                        />
-
-                        {canEdit && (
-                          <button
-                            onClick={() =>
-                              openEdit(teacher)
-                            }
-                            className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
-                            title="Edit"
-                          >
-                            <Pencil size={15} />
-                          </button>
+                      {/* Status */}
+                      <td className="px-4 py-4">
+                        {teacher.status ===
+                        "inactive" ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            Inactive
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-50 text-green-600">
+                            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                            Active
+                          </span>
                         )}
+                      </td>
 
-                        {canDelete && (
-                          <button
-                            onClick={() =>
-                              handleDelete(
-                                teacher.id
-                              )
-                            }
-                            className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
-                            title="Delete"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Joining Date */}
+                      <td className="px-4 py-4">
+                        {teacher.joining_date ||
+                          "—"}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
+
+                          <IdCardButton
+                            person={teacher}
+                            type="Teacher"
+                          />
+
+                          {canEdit && (
+                            <button
+                              onClick={() =>
+                                openEdit(
+                                  teacher
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-[#f0f2f5] text-navy-900/60"
+                              title="Edit"
+                            >
+                              <Pencil
+                                size={15}
+                              />
+                            </button>
+                          )}
+
+                          {canDelete && (
+                            <button
+                              onClick={() =>
+                                handleDelete(
+                                  teacher.id
+                                )
+                              }
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+                              title="Delete"
+                            >
+                              <Trash2
+                                size={15}
+                              />
+                            </button>
+                          )}
+
+                        </div>
+                      </td>
+
+                    </tr>
+                  )
+                )}
               </tbody>
             </table>
           </div>
         )}
 
-        {/* Add/Edit Teacher Modal */}
+        {/* Add / Edit Teacher Modal */}
         <Modal
           open={modalOpen}
-          onClose={() => setModalOpen(false)}
+          onClose={closeModal}
           title={
             editingId
               ? "Edit Teacher"
@@ -754,6 +851,7 @@ export default function Teachers() {
             className="space-y-5"
           >
 
+            {/* Error */}
             {error && (
               <div className="text-sm bg-red-50 text-red-600 border border-red-100 rounded-lg px-3 py-2">
                 {error}
@@ -768,7 +866,7 @@ export default function Teachers() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-                {/* Full Name */}
+                {/* Name */}
                 <div>
                   <label className="form-label">
                     Full name
@@ -820,7 +918,7 @@ export default function Teachers() {
                 <div>
                   <label className="form-label">
                     {editingId
-                      ? "New password (leave blank to keep current)"
+                      ? "New Password"
                       : "Password"}
                   </label>
 
@@ -832,23 +930,26 @@ export default function Teachers() {
                     className="form-input"
                     placeholder={
                       editingId
-                        ? "Leave blank to keep current password"
-                        : "Enter password (minimum 6 characters)"
+                        ? "Leave blank to keep current"
+                        : "Enter password"
                     }
-                    minLength={6}
                     required={!editingId}
-                    autoComplete="new-password"
+                    minLength={
+                      editingId
+                        ? undefined
+                        : 6
+                    }
                   />
 
                   {editingId ? (
                     <p className="text-xs text-navy-900/50 mt-1">
-                      Leave this blank if you do not want
-                      to change the current password.
+                      Leave blank to keep current
+                      password.
                     </p>
                   ) : (
                     <p className="text-xs text-navy-900/50 mt-1">
-                      Password must be at least 6
-                      characters.
+                      Password must be at least
+                      6 characters.
                     </p>
                   )}
                 </div>
@@ -914,6 +1015,7 @@ export default function Teachers() {
                     placeholder="Full residential address"
                   />
                 </div>
+
               </div>
             </div>
 
@@ -1038,7 +1140,9 @@ export default function Teachers() {
 
                   <select
                     name="employment_type"
-                    value={form.employment_type}
+                    value={
+                      form.employment_type
+                    }
                     onChange={handleChange}
                     className="form-input"
                   >
@@ -1100,6 +1204,7 @@ export default function Teachers() {
                     </option>
                   </select>
                 </div>
+
               </div>
             </div>
 
@@ -1108,10 +1213,8 @@ export default function Teachers() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setModalOpen(false);
-                  setError("");
-                }}
+                onClick={closeModal}
+                disabled={saving}
                 className="btn-outline"
               >
                 Cancel
