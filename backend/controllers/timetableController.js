@@ -1,104 +1,85 @@
 const {
+  TimetableSlot,
   Student,
   SchoolClass,
+  Teacher,
 } = require("../models");
 
-const { logAction } = require("../utils/audit");
-
 // ---------------------------------------------------------
-// SchoolClass fields
-// ---------------------------------------------------------
-
-const classAttributes = [
-  "id",
-  "course_name",
-  "course_code",
-  "department_name",
-  "department_code",
-  "year",
-  "semester",
-  "session",
-  "section",
-];
-
-// ---------------------------------------------------------
-// GET /api/students
+// GET /api/timetable
 // admin, management, teacher
+// Optional:
+// ?class_id=
+// ?teacher_id=
+// ?day=
 // ---------------------------------------------------------
 
-exports.getAllStudents = async (req, res) => {
+exports.getTimetable = async (req, res) => {
   try {
-    const students = await Student.findAll({
-      include: [
-        {
-          model: SchoolClass,
-          attributes: classAttributes,
-        },
-      ],
-      order: [["name", "ASC"]],
-    });
+    const where = {};
 
-    res.json(students);
-  } catch (err) {
-    console.error("getAllStudents:", err);
-
-    res.status(500).json({
-      message: "Failed to fetch students.",
-      error: err.message,
-    });
-  }
-};
-
-// ---------------------------------------------------------
-// GET /api/students/:id
-// admin, management, teacher
-// ---------------------------------------------------------
-
-exports.getStudentById = async (req, res) => {
-  try {
-    const student = await Student.findByPk(req.params.id, {
-      include: [
-        {
-          model: SchoolClass,
-          attributes: classAttributes,
-        },
-      ],
-    });
-
-    if (!student) {
-      return res.status(404).json({
-        message: "Student not found.",
-      });
+    if (req.query.class_id) {
+      where.class_id = req.query.class_id;
     }
 
-    res.json(student);
+    if (req.query.teacher_id) {
+      where.teacher_id = req.query.teacher_id;
+    }
+
+    if (req.query.day) {
+      where.day = req.query.day;
+    }
+
+    const slots = await TimetableSlot.findAll({
+      where,
+      include: [
+        {
+          model: SchoolClass,
+          attributes: [
+            "id",
+            "course_name",
+            "course_code",
+            "department_name",
+            "department_code",
+            "year",
+            "semester",
+            "session",
+            "section",
+          ],
+        },
+        {
+          model: Teacher,
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [
+        ["day", "ASC"],
+        ["start_time", "ASC"],
+      ],
+    });
+
+    res.json(slots);
   } catch (err) {
-    console.error("getStudentById:", err);
+    console.error("getTimetable:", err);
 
     res.status(500).json({
-      message: "Failed to fetch student.",
+      message: "Failed to fetch timetable.",
       error: err.message,
     });
   }
 };
 
 // ---------------------------------------------------------
-// GET /api/students/me/profile
-// Student - ONLY their own profile
+// GET /api/timetable/me
+// Student - ONLY their own class timetable
 // ---------------------------------------------------------
 
-exports.getMyStudentProfile = async (req, res) => {
+exports.getMyTimetable = async (req, res) => {
   try {
     const student = await Student.findOne({
       where: {
         user_id: req.user.id,
       },
-      include: [
-        {
-          model: SchoolClass,
-          attributes: classAttributes,
-        },
-      ],
     });
 
     if (!student) {
@@ -107,225 +88,124 @@ exports.getMyStudentProfile = async (req, res) => {
       });
     }
 
-    res.json(student);
-  } catch (err) {
-    console.error("getMyStudentProfile:", err);
-
-    res.status(500).json({
-      message: "Failed to fetch profile.",
-      error: err.message,
-    });
-  }
-};
-
-// ---------------------------------------------------------
-// GET /api/students/me/dashboard
-// Student - ONLY their own basic data
-// ---------------------------------------------------------
-
-exports.getMyStudentDashboard = async (req, res) => {
-  try {
-    const student = await Student.findOne({
-      where: {
-        user_id: req.user.id,
-      },
-      include: [
-        {
-          model: SchoolClass,
-          attributes: classAttributes,
-        },
-      ],
-    });
-
-    if (!student) {
-      return res.status(404).json({
-        message: "Student profile not found.",
-      });
+    if (!student.class_id) {
+      return res.json([]);
     }
 
-    res.json({
-      student: {
-        id: student.id,
-        name: student.name,
-        email: student.email,
-        roll_no: student.roll_no,
-        admission_no: student.admission_no,
+    const slots = await TimetableSlot.findAll({
+      where: {
         class_id: student.class_id,
-        class: student.SchoolClass || null,
       },
+      include: [
+        {
+          model: SchoolClass,
+          attributes: [
+            "id",
+            "course_name",
+            "course_code",
+            "department_name",
+            "department_code",
+            "year",
+            "semester",
+            "session",
+            "section",
+          ],
+        },
+        {
+          model: Teacher,
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [
+        ["day", "ASC"],
+        ["start_time", "ASC"],
+      ],
     });
+
+    res.json(slots);
   } catch (err) {
-    console.error("getMyStudentDashboard:", err);
+    console.error("getMyTimetable:", err);
 
     res.status(500).json({
-      message: "Failed to fetch student dashboard.",
+      message: "Failed to fetch your timetable.",
       error: err.message,
     });
   }
 };
 
 // ---------------------------------------------------------
-// POST /api/students
+// POST /api/timetable
 // admin, management
 // ---------------------------------------------------------
 
-exports.createStudent = async (req, res) => {
+exports.createSlot = async (req, res) => {
   try {
-    const student = await Student.create(req.body);
+    const slot = await TimetableSlot.create(req.body);
 
-    await logAction(req, {
-      action: "create",
-      entity: "Student",
-      entityId: student.id,
-      details: {
-        name: student.name,
-      },
-    });
-
-    res.status(201).json(student);
+    res.status(201).json(slot);
   } catch (err) {
-    console.error("createStudent:", err);
+    console.error("createSlot:", err);
 
     res.status(500).json({
-      message: "Failed to create student.",
+      message: "Failed to create timetable slot.",
       error: err.message,
     });
   }
 };
 
 // ---------------------------------------------------------
-// PUT /api/students/:id
+// PUT /api/timetable/:id
 // admin, management
 // ---------------------------------------------------------
 
-exports.updateStudent = async (req, res) => {
+exports.updateSlot = async (req, res) => {
   try {
-    const student = await Student.findByPk(req.params.id);
+    const slot = await TimetableSlot.findByPk(req.params.id);
 
-    if (!student) {
+    if (!slot) {
       return res.status(404).json({
-        message: "Student not found.",
+        message: "Timetable slot not found.",
       });
     }
 
-    await student.update(req.body);
+    await slot.update(req.body);
 
-    await logAction(req, {
-      action: "update",
-      entity: "Student",
-      entityId: student.id,
-      details: req.body,
-    });
-
-    res.json(student);
+    res.json(slot);
   } catch (err) {
-    console.error("updateStudent:", err);
+    console.error("updateSlot:", err);
 
     res.status(500).json({
-      message: "Failed to update student.",
+      message: "Failed to update timetable slot.",
       error: err.message,
     });
   }
 };
 
 // ---------------------------------------------------------
-// POST /api/students/bulk
+// DELETE /api/timetable/:id
 // admin, management
 // ---------------------------------------------------------
 
-exports.bulkCreateStudents = async (req, res) => {
+exports.deleteSlot = async (req, res) => {
   try {
-    const { students } = req.body;
+    const slot = await TimetableSlot.findByPk(req.params.id);
 
-    if (!Array.isArray(students) || students.length === 0) {
-      return res.status(400).json({
-        message: "students[] is required.",
-      });
-    }
-
-    const created = [];
-    const errors = [];
-
-    for (let i = 0; i < students.length; i++) {
-      try {
-        const row = students[i];
-
-        if (!row.name) {
-          errors.push({
-            row: i + 1,
-            error: "Missing name",
-          });
-
-          continue;
-        }
-
-        const student = await Student.create(row);
-
-        created.push(student);
-      } catch (err) {
-        errors.push({
-          row: i + 1,
-          error: err.message,
-        });
-      }
-    }
-
-    await logAction(req, {
-      action: "bulk_import",
-      entity: "Student",
-      details: {
-        count: created.length,
-      },
-    });
-
-    res.status(201).json({
-      created: created.length,
-      errors,
-    });
-  } catch (err) {
-    console.error("bulkCreateStudents:", err);
-
-    res.status(500).json({
-      message: "Bulk import failed.",
-      error: err.message,
-    });
-  }
-};
-
-// ---------------------------------------------------------
-// DELETE /api/students/:id
-// admin only
-// ---------------------------------------------------------
-
-exports.deleteStudent = async (req, res) => {
-  try {
-    const student = await Student.findByPk(req.params.id);
-
-    if (!student) {
+    if (!slot) {
       return res.status(404).json({
-        message: "Student not found.",
+        message: "Timetable slot not found.",
       });
     }
 
-    await logAction(req, {
-      action: "delete",
-      entity: "Student",
-      entityId: student.id,
-      details: {
-        name: student.name,
-      },
-    });
-
-    await student.destroy();
+    await slot.destroy();
 
     res.json({
-      message: "Student deleted.",
+      message: "Timetable slot deleted.",
     });
   } catch (err) {
-    console.error("deleteStudent:", err);
+    console.error("deleteSlot:", err);
 
     res.status(500).json({
-      message: "Failed to delete student.",
+      message: "Failed to delete timetable slot.",
       error: err.message,
     });
   }
