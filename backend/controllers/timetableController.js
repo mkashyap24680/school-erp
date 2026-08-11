@@ -1,517 +1,335 @@
 const {
-  TimetableSlot,
-  SchoolClass,
-  Teacher,
   Student,
+  SchoolClass,
+  User,
+  Attendance,
+  Fee,
+  Result,
 } = require("../models");
 
 const { logAction } = require("../utils/audit");
 
-// --------------------------------------------------
-// HELPERS
-// --------------------------------------------------
+// ---------------------------------------------------------
+// SchoolClass fields
+// ---------------------------------------------------------
 
-const getTimeMinutes = (time) => {
-  if (!time) return 0;
+const classAttributes = [
+  "id",
+  "course_name",
+  "course_code",
+  "department_name",
+  "department_code",
+  "year",
+  "semester",
+  "session",
+  "section",
+];
 
-  const [hours, minutes] = String(time)
-    .slice(0, 5)
-    .split(":")
-    .map(Number);
+// ---------------------------------------------------------
+// GET /api/students
+// admin, management, teacher
+// ---------------------------------------------------------
 
-  return hours * 60 + minutes;
-};
-
-const isTimeOverlap = (
-  startA,
-  endA,
-  startB,
-  endB
-) => {
-  return (
-    getTimeMinutes(startA) <
-      getTimeMinutes(endB) &&
-    getTimeMinutes(endA) >
-      getTimeMinutes(startB)
-  );
-};
-
-// --------------------------------------------------
-// CHECK TEACHER / CLASS CONFLICT
-// --------------------------------------------------
-
-const checkConflict = async ({
-  class_id,
-  teacher_id,
-  day,
-  start_time,
-  end_time,
-  excludeId = null,
-}) => {
-  const slots = await TimetableSlot.findAll({
-    where: {
-      day,
-    },
-  });
-
-  for (const slot of slots) {
-    // Current slot ko ignore karo while editing
-    if (
-      excludeId &&
-      String(slot.id) === String(excludeId)
-    ) {
-      continue;
-    }
-
-    const overlap = isTimeOverlap(
-      start_time,
-      end_time,
-      slot.start_time,
-      slot.end_time
-    );
-
-    if (!overlap) {
-      continue;
-    }
-
-    // Teacher conflict
-    if (
-      teacher_id &&
-      String(slot.teacher_id) === String(teacher_id)
-    ) {
-      return {
-        type: "teacher",
-        message:
-          "This teacher already has another class during this time.",
-      };
-    }
-
-    // Class conflict
-    if (
-      String(slot.class_id) === String(class_id)
-    ) {
-      return {
-        type: "class",
-        message:
-          "This class already has another subject during this time.",
-      };
-    }
-  }
-
-  return null;
-};
-
-// --------------------------------------------------
-// GET ALL TIMETABLE
-// GET /api/timetable
-// --------------------------------------------------
-
-exports.getTimetable = async (req, res) => {
+exports.getAllStudents = async (req, res) => {
   try {
-    const where = {};
-
-    if (req.query.class_id) {
-      where.class_id = req.query.class_id;
-    }
-
-    if (req.query.teacher_id) {
-      where.teacher_id = req.query.teacher_id;
-    }
-
-    if (req.query.day) {
-      where.day = req.query.day;
-    }
-
-    const slots = await TimetableSlot.findAll({
-      where,
-
+    const students = await Student.findAll({
       include: [
         {
           model: SchoolClass,
-          attributes: [
-            "id",
-            "name",
-            "section",
-          ],
+          attributes: classAttributes,
         },
+      ],
+      order: [["name", "ASC"]],
+    });
+
+    res.json(students);
+  } catch (err) {
+    console.error("getAllStudents:", err);
+
+    res.status(500).json({
+      message: "Failed to fetch students.",
+      error: err.message,
+    });
+  }
+};
+
+// ---------------------------------------------------------
+// GET /api/students/:id
+// admin, management, teacher
+// ---------------------------------------------------------
+
+exports.getStudentById = async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.params.id, {
+      include: [
         {
-          model: Teacher,
-          attributes: [
-            "id",
-            "name",
-          ],
+          model: SchoolClass,
+          attributes: classAttributes,
         },
       ],
+    });
 
-      order: [
-        ["day", "ASC"],
-        ["start_time", "ASC"],
+    if (!student) {
+      return res.status(404).json({
+        message: "Student not found.",
+      });
+    }
+
+    res.json(student);
+  } catch (err) {
+    console.error("getStudentById:", err);
+
+    res.status(500).json({
+      message: "Failed to fetch student.",
+      error: err.message,
+    });
+  }
+};
+
+// ---------------------------------------------------------
+// GET /api/students/me/profile
+// Student - ONLY their own profile
+// ---------------------------------------------------------
+
+exports.getMyStudentProfile = async (req, res) => {
+  try {
+    const student = await Student.findOne({
+      where: {
+        user_id: req.user.id,
+      },
+      include: [
+        {
+          model: SchoolClass,
+          attributes: classAttributes,
+        },
       ],
     });
 
-    res.json(slots);
+    if (!student) {
+      return res.status(404).json({
+        message: "Student profile not found.",
+      });
+    }
+
+    res.json(student);
   } catch (err) {
-    console.error(
-      "Get timetable error:",
-      err
-    );
+    console.error("getMyStudentProfile:", err);
 
     res.status(500).json({
-      message: "Failed to fetch timetable.",
+      message: "Failed to fetch profile.",
       error: err.message,
     });
   }
 };
 
-// --------------------------------------------------
-// GET MY TIMETABLE
-// GET /api/timetable/me
-// --------------------------------------------------
+// ---------------------------------------------------------
+// GET /api/students/me/dashboard
+// Student - ONLY their own data
+// ---------------------------------------------------------
 
-exports.getMyTimetable = async (
-  req,
-  res
-) => {
+exports.getMyStudentDashboard = async (req, res) => {
   try {
-    let where = {};
+    const student = await Student.findOne({
+      where: {
+        user_id: req.user.id,
+      },
+      include: [
+        {
+          model: SchoolClass,
+          attributes: classAttributes,
+        },
+      ],
+    });
 
-    // Student
-    if (req.user.role === "student") {
-      const student =
-        await Student.findOne({
-          where: {
-            user_id: req.user.id,
-          },
-        });
-
-      if (
-        !student ||
-        !student.class_id
-      ) {
-        return res.json([]);
-      }
-
-      where.class_id = student.class_id;
-    }
-
-    // Teacher
-    else if (
-      req.user.role === "teacher"
-    ) {
-      const teacher =
-        await Teacher.findOne({
-          where: {
-            user_id: req.user.id,
-          },
-        });
-
-      if (!teacher) {
-        return res.json([]);
-      }
-
-      where.teacher_id = teacher.id;
-    }
-
-    const slots =
-      await TimetableSlot.findAll({
-        where,
-
-        include: [
-          {
-            model: SchoolClass,
-            attributes: [
-              "id",
-              "name",
-              "section",
-            ],
-          },
-          {
-            model: Teacher,
-            attributes: [
-              "id",
-              "name",
-            ],
-          },
-        ],
-
-        order: [
-          ["day", "ASC"],
-          ["start_time", "ASC"],
-        ],
+    if (!student) {
+      return res.status(404).json({
+        message: "Student profile not found.",
       });
+    }
 
-    res.json(slots);
+    res.json({
+      student: {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        roll_no: student.roll_no,
+        admission_no: student.admission_no,
+        class_id: student.class_id,
+        class: student.SchoolClass || null,
+      },
+    });
   } catch (err) {
-    console.error(
-      "Get my timetable error:",
-      err
-    );
+    console.error("getMyStudentDashboard:", err);
 
     res.status(500).json({
-      message:
-        "Failed to fetch my timetable.",
+      message: "Failed to fetch student dashboard.",
       error: err.message,
     });
   }
 };
 
-// --------------------------------------------------
-// CREATE TIMETABLE
-// POST /api/timetable
-// --------------------------------------------------
+// ---------------------------------------------------------
+// POST /api/students
+// admin, management
+// ---------------------------------------------------------
 
-exports.createSlot = async (
-  req,
-  res
-) => {
+exports.createStudent = async (req, res) => {
   try {
-    const {
-      class_id,
-      teacher_id,
-      subject,
-      day,
-      start_time,
-      end_time,
-      room,
-    } = req.body;
-
-    // Basic validation
-    if (
-      !class_id ||
-      !teacher_id ||
-      !subject ||
-      !day ||
-      !start_time ||
-      !end_time
-    ) {
-      return res.status(400).json({
-        message:
-          "Class, teacher, subject, day, start time and end time are required.",
-      });
-    }
-
-    // Time validation
-    if (
-      getTimeMinutes(end_time) <=
-      getTimeMinutes(start_time)
-    ) {
-      return res.status(400).json({
-        message:
-          "End time must be after start time.",
-      });
-    }
-
-    // Conflict check
-    const conflict =
-      await checkConflict({
-        class_id,
-        teacher_id,
-        day,
-        start_time,
-        end_time,
-      });
-
-    if (conflict) {
-      return res.status(409).json({
-        message: conflict.message,
-        conflict_type:
-          conflict.type,
-      });
-    }
-
-    const payload = {
-      class_id,
-      teacher_id,
-      subject: subject.trim(),
-      day,
-      start_time,
-      end_time,
-      room: room
-        ? room.trim()
-        : null,
-    };
-
-    const slot =
-      await TimetableSlot.create(
-        payload
-      );
+    const student = await Student.create(req.body);
 
     await logAction(req, {
       action: "create",
-      entity: "TimetableSlot",
-      entityId: slot.id,
-      details: payload,
+      entity: "Student",
+      entityId: student.id,
+      details: {
+        name: student.name,
+      },
     });
 
-    res.status(201).json(slot);
+    res.status(201).json(student);
   } catch (err) {
-    console.error(
-      "Create timetable error:",
-      err
-    );
+    console.error("createStudent:", err);
 
     res.status(500).json({
-      message:
-        "Failed to create timetable slot.",
+      message: "Failed to create student.",
       error: err.message,
     });
   }
 };
 
-// --------------------------------------------------
-// UPDATE TIMETABLE
-// PUT /api/timetable/:id
-// --------------------------------------------------
+// ---------------------------------------------------------
+// PUT /api/students/:id
+// admin, management
+// ---------------------------------------------------------
 
-exports.updateSlot = async (
-  req,
-  res
-) => {
+exports.updateStudent = async (req, res) => {
   try {
-    const slot =
-      await TimetableSlot.findByPk(
-        req.params.id
-      );
+    const student = await Student.findByPk(req.params.id);
 
-    if (!slot) {
+    if (!student) {
       return res.status(404).json({
-        message:
-          "Timetable slot not found.",
+        message: "Student not found.",
       });
     }
 
-    const {
-      class_id,
-      teacher_id,
-      subject,
-      day,
-      start_time,
-      end_time,
-      room,
-    } = req.body;
-
-    if (
-      !class_id ||
-      !teacher_id ||
-      !subject ||
-      !day ||
-      !start_time ||
-      !end_time
-    ) {
-      return res.status(400).json({
-        message:
-          "Class, teacher, subject, day, start time and end time are required.",
-      });
-    }
-
-    if (
-      getTimeMinutes(end_time) <=
-      getTimeMinutes(start_time)
-    ) {
-      return res.status(400).json({
-        message:
-          "End time must be after start time.",
-      });
-    }
-
-    // Conflict check excluding current slot
-    const conflict =
-      await checkConflict({
-        class_id,
-        teacher_id,
-        day,
-        start_time,
-        end_time,
-        excludeId: slot.id,
-      });
-
-    if (conflict) {
-      return res.status(409).json({
-        message: conflict.message,
-        conflict_type:
-          conflict.type,
-      });
-    }
-
-    const payload = {
-      class_id,
-      teacher_id,
-      subject: subject.trim(),
-      day,
-      start_time,
-      end_time,
-      room: room
-        ? room.trim()
-        : null,
-    };
-
-    await slot.update(payload);
+    await student.update(req.body);
 
     await logAction(req, {
       action: "update",
-      entity: "TimetableSlot",
-      entityId: slot.id,
-      details: payload,
+      entity: "Student",
+      entityId: student.id,
+      details: req.body,
     });
 
-    res.json(slot);
+    res.json(student);
   } catch (err) {
-    console.error(
-      "Update timetable error:",
-      err
-    );
+    console.error("updateStudent:", err);
 
     res.status(500).json({
-      message:
-        "Failed to update timetable slot.",
+      message: "Failed to update student.",
       error: err.message,
     });
   }
 };
 
-// --------------------------------------------------
-// DELETE TIMETABLE
-// DELETE /api/timetable/:id
-// --------------------------------------------------
+// ---------------------------------------------------------
+// POST /api/students/bulk
+// admin, management
+// ---------------------------------------------------------
 
-exports.deleteSlot = async (
-  req,
-  res
-) => {
+exports.bulkCreateStudents = async (req, res) => {
   try {
-    const slot =
-      await TimetableSlot.findByPk(
-        req.params.id
-      );
+    const { students } = req.body;
 
-    if (!slot) {
+    if (!Array.isArray(students) || students.length === 0) {
+      return res.status(400).json({
+        message: "students[] is required.",
+      });
+    }
+
+    const created = [];
+    const errors = [];
+
+    for (let i = 0; i < students.length; i++) {
+      try {
+        const row = students[i];
+
+        if (!row.name) {
+          errors.push({
+            row: i + 1,
+            error: "Missing name",
+          });
+
+          continue;
+        }
+
+        const student = await Student.create(row);
+
+        created.push(student);
+      } catch (err) {
+        errors.push({
+          row: i + 1,
+          error: err.message,
+        });
+      }
+    }
+
+    await logAction(req, {
+      action: "bulk_import",
+      entity: "Student",
+      details: {
+        count: created.length,
+      },
+    });
+
+    res.status(201).json({
+      created: created.length,
+      errors,
+    });
+  } catch (err) {
+    console.error("bulkCreateStudents:", err);
+
+    res.status(500).json({
+      message: "Bulk import failed.",
+      error: err.message,
+    });
+  }
+};
+
+// ---------------------------------------------------------
+// DELETE /api/students/:id
+// admin only
+// ---------------------------------------------------------
+
+exports.deleteStudent = async (req, res) => {
+  try {
+    const student = await Student.findByPk(req.params.id);
+
+    if (!student) {
       return res.status(404).json({
-        message:
-          "Timetable slot not found.",
+        message: "Student not found.",
       });
     }
 
     await logAction(req, {
       action: "delete",
-      entity: "TimetableSlot",
-      entityId: slot.id,
+      entity: "Student",
+      entityId: student.id,
+      details: {
+        name: student.name,
+      },
     });
 
-    await slot.destroy();
+    await student.destroy();
 
     res.json({
-      message:
-        "Timetable slot deleted successfully.",
+      message: "Student deleted.",
     });
   } catch (err) {
-    console.error(
-      "Delete timetable error:",
-      err
-    );
+    console.error("deleteStudent:", err);
 
     res.status(500).json({
-      message:
-        "Failed to delete timetable slot.",
+      message: "Failed to delete student.",
       error: err.message,
     });
   }
